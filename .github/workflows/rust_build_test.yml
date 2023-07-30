@@ -44,10 +44,6 @@ jobs:
           - target: universal-apple-darwin
             os: macos-latest
     runs-on: ${{ matrix.os }}
-    container:
-      resources:
-        limits:
-          memory: 2GB
     steps:
       - name: Checkout Code
         uses: actions/checkout@master
