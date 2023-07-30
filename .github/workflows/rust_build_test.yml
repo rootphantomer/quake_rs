@@ -29,11 +29,11 @@ jobs:
     name: "Upload assets"
     needs: tagged-release-test
     matrix:
-    fail-fast: false
-    os:
-      - ubuntu-latest
-      - macos-latest
-      - windows-latest
+      fail-fast: false
+      os:
+        - ubuntu-latest
+        - macos-latest
+        - windows-latest
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout Code
