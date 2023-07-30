@@ -43,6 +43,8 @@ jobs:
           # Universal macOS binary is supported as universal-apple-darwin.
           - target: universal-apple-darwin
             os: macos-latest
+          - target: x86_64-windows
+            os: windows-latest
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout Code
@@ -53,5 +55,5 @@ jobs:
           ref: refs/tags/latest
           bin: quake
           target: ${{ matrix.target }}
-          archive: $bin-$target
+          archive: $bin-$tag-$target
           token: ${{ secrets.GITHUB_TOKEN }}
