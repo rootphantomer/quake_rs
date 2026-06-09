@@ -393,7 +393,7 @@ impl ArgParse {
                         let info_jf = match Quake::new(res).info() {
                             Ok(value) => value,
                             Err(e) => {
-                                Output::error(&format!("Query failed: {}", e.to_string()));
+                                Output::error(&format!("Query failed: {}", e));
                                 std::process::exit(1);
                             }
                         };
@@ -411,7 +411,7 @@ impl ArgParse {
                         ));
                     }
                     Err(e) => {
-                        Output::error(&format!("Data saving failure:{}", e.to_string()));
+                                Output::error(&format!("Data saving failure:{}", e));
                     }
                 };
             }
@@ -432,7 +432,7 @@ impl ArgParse {
                 if size > 100 {
                     Output::warning("Warning: Size is set to a maximum of 100, if set too high it may cause abnormal slowdowns or timeouts.");
                 }
-                if query_host_file == "" {
+                if query_host_file.is_empty() {
                     let ip = match host_match.get_one::<String>("ip") {
                         Some(ip) => ip.to_string(),
                         None => {
@@ -452,7 +452,7 @@ impl ArgParse {
                             let info_jf = match Quake::new(res).info() {
                                 Ok(value) => value,
                                 Err(e) => {
-                                    Output::error(&format!("Query failed: {}", e.to_string()));
+                            Output::error(&format!("Query failed: {}", e));
                                     std::process::exit(1);
                                 }
                             };
@@ -470,14 +470,14 @@ impl ArgParse {
                             ));
                         }
                         Err(e) => {
-                            Output::error(&format!("Data saving failure:{}", e.to_string()));
+                            Output::error(&format!("Data saving failure:{}", e));
                         }
                     };
                 } else {
                     let host_string = persistence::read_file_host(query_host_file);
                     let query = host_string.as_str();
-                    if query == "" {
-                        Output::info(&format!("The host file is None!"));
+                    if query.is_empty() {
+                        Output::info("The host file is None!");
                         std::process::exit(1);
                     }
                     let response = Quake::query_host_by_scroll(query, size);
@@ -498,7 +498,7 @@ impl ArgParse {
                             ));
                         }
                         Err(e) => {
-                            Output::error(&format!("Data saving failure:{}", e.to_string()));
+                            Output::error(&format!("Data saving failure:{}", e));
                         }
                     };
                 }
@@ -518,10 +518,10 @@ impl ArgParse {
                 let query = match search_match.get_one::<String>("query_string") {
                     Some(query) => query.to_string(),
                     None => {
-                        if upload == "" && query_file == "" {
+                        if upload.is_empty() && query_file.is_empty() {
                             Output::error("Error: You must enter a search syntax.\r\nPlease execute -h for help.");
                             std::process::exit(1);
-                        } else if query_file != "" {
+                        } else if !query_file.is_empty() {
                             query_string = persistence::read_file_search(query_file);
                             query_string.to_string()
                         } else {
@@ -581,7 +581,7 @@ impl ArgParse {
                     None => "".to_string(),
                 };
                 let filter = &filter;
-                if query_file == "" {
+                if query_file.is_empty() {
                     let response = Quake::query(
                         query, upload, start, size, time_start, time_end, cdn, mg, zxsj, wxqq, sjqc,
                     );
@@ -593,7 +593,7 @@ impl ArgParse {
                             let info_jf = match Quake::new(res).info() {
                                 Ok(value) => value,
                                 Err(e) => {
-                                    Output::error(&format!("Query failed: {}", e.to_string()));
+                                    Output::error(&format!("Query failed: {}", e));
                                     std::process::exit(1);
                                 }
                             };
@@ -611,11 +611,11 @@ impl ArgParse {
                             ));
                         }
                         Err(e) => {
-                            Output::error(&format!("Data saving failure:{}", e.to_string()));
+                            Output::error(&format!("Data saving failure:{}", e));
                         }
                     };
                 } else {
-                    if query != "" {
+                    if !query.is_empty() {
                         Output::info(&format!("Search with {}", query));
                     }
                     let response = Quake::query_for_scroll(
@@ -639,7 +639,7 @@ impl ArgParse {
                             ));
                         }
                         Err(e) => {
-                            Output::error(&format!("Data saving failure:{}", e.to_string()));
+                            Output::error(&format!("Data saving failure:{}", e));
                         }
                     };
                 }
@@ -649,7 +649,7 @@ impl ArgParse {
                 let info = match Quake::new(res).info() {
                     Ok(value) => value,
                     Err(e) => {
-                        Output::error(&format!("Query failed: {}", e.to_string()));
+                        Output::error(&format!("Query failed: {}", e));
                         std::process::exit(1);
                     }
                 };
@@ -675,7 +675,7 @@ impl ArgParse {
                     }
                     Err(err) => {
                         eprintln!("Error: {}", err);
-                        Err(err.into())
+                        Err(err)
                     }
                 };
                 let upload = match gpt_match.get_one::<String>("upload") {
@@ -769,7 +769,7 @@ impl ArgParse {
                     None => "".to_string(),
                 };
                 let filter = &filter;
-                if query_file == "" {
+                if query_file.is_empty() {
                     let response = Quake::query(
                         query, upload, start, size, time_start, time_end, cdn, mg, zxsj, wxqq, sjqc,
                     );
@@ -793,11 +793,11 @@ impl ArgParse {
                             ));
                         }
                         Err(e) => {
-                            Output::error(&format!("Data saving failure:{}", e.to_string()));
+                            Output::error(&format!("Data saving failure:{}", e));
                         }
                     };
                 } else {
-                    if query != "" {
+                    if !query.is_empty() {
                         Output::info(&format!("Search with {}", query));
                     }
                     let response = Quake::query_for_scroll(
@@ -821,7 +821,7 @@ impl ArgParse {
                             ));
                         }
                         Err(e) => {
-                            Output::error(&format!("Data saving failure:{}", e.to_string()));
+                            Output::error(&format!("Data saving failure:{}", e));
                         }
                     };
                 }
@@ -850,7 +850,7 @@ impl ArgParse {
                 let response: Value = match Quake::new(res).aggservice(&s) {
                     Ok(response) => response,
                     Err(e) => {
-                        Output::error(&format!("Query failed: {}", e.to_string()));
+                        Output::error(&format!("Query failed: {}", e));
                         std::process::exit(1);
                     }
                 };

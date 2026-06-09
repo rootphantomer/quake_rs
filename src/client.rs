@@ -7,7 +7,7 @@ use serde_json::{Map, Number, Value};
 use std::fs;
 
 //BaseUrl is the basis for all of our api requests.
-const BASE_URL: &'static str = "https://quake.360.net";
+const BASE_URL: &str = "https://quake.360.net";
 // Removed unused constant to fix the warning
 pub struct Quake {
     api_key: String,
@@ -32,7 +32,7 @@ impl Quake {
         let response: Value = match Quake::new(res).search_host(&h) {
             Ok(response) => response,
             Err(e) => {
-                Output::error(&format!("Query failed: {}", e.to_string()));
+                Output::error(&format!("Query failed: {}", e));
                 std::process::exit(1);
             }
         };
@@ -50,7 +50,7 @@ impl Quake {
                 if e.is_timeout() {
                     Output::error("Connect Timeout!!");
                 } else {
-                    Output::error(&format!("Connect error!!!\r\n{}", e.to_string()));
+                    Output::error(&format!("Connect error!!!\r\n{}", e));
                 }
                 std::process::exit(1);
             }
@@ -73,7 +73,7 @@ impl Quake {
         let response = match Quake::new(res).search_host_by_scroll(query_string, size) {
             Ok(response) => response,
             Err(e) => {
-                Output::error(&format!("Query failed: {}", e.to_string()));
+                Output::error(&format!("Query failed: {}", e));
                 std::process::exit(1);
             }
         };
@@ -130,7 +130,7 @@ impl Quake {
                 if e.is_timeout() {
                     Output::error("Connect Timeout!!");
                 } else {
-                    Output::error(&format!("Connect error!!!\r\n{}", e.to_string()));
+                    Output::error(&format!("Connect error!!!\r\n{}", e));
                 }
                 std::process::exit(1);
             }
@@ -141,7 +141,7 @@ impl Quake {
                 if e.is_timeout() {
                     Output::error("Connect Timeout!!");
                 } else {
-                    Output::error(&format!("Connect error!!!\r\n{}", e.to_string()));
+                    Output::error(&format!("Connect error!!!\r\n{}", e));
                 }
                 std::process::exit(1);
             }
@@ -168,18 +168,19 @@ impl Quake {
             ignore_cache: false,
             pagination_id: "".to_string(),
         };
-        if query_string != "" {
-            sh.query = format!("{}", query_string);
+        if !query_string.is_empty() {
+            sh.query = query_string.to_string();
         } else {
-            Output::info(&format!("Search failed"));
+            Output::info("Search failed");
             std::process::exit(1);
         }
-        if pagination_id != "" {
-            sh.pagination_id = format!("{}", pagination_id);
+        if !pagination_id.is_empty() {
+            sh.pagination_id = pagination_id.to_string();
         }
         sh
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn query(
         query_string: &str,
         file_name: &str,
@@ -226,35 +227,35 @@ impl Quake {
                 .push(Value::String("610ce2fbda6d29df72ac56eb".to_string()));
         }
         let (local, one_years_ago) = crate::models::getdate();
-        if time_start == "" && time_end == "" {
+        if time_start.is_empty() && time_end.is_empty() {
             s.start_time = one_years_ago;
             s.end_time = local;
-        } else if time_start != "" && time_end == "" {
+        } else if !time_start.is_empty() && time_end.is_empty() {
             s.start_time = time_start.to_string();
             s.end_time = local;
-        } else if time_start == "" && time_end != "" {
+        } else if time_start.is_empty() && !time_end.is_empty() {
             s.start_time = crate::models::getdate_for_manual(time_end);
             s.end_time = time_end.to_string();
-        } else if time_start != "" && time_end != "" {
+        } else if !time_start.is_empty() && !time_end.is_empty() {
             s.start_time = time_start.to_string();
             s.end_time = time_end.to_string();
         }
-        if file_name != "" {
+        if !file_name.is_empty() {
             let ips: String = match fs::read_to_string(file_name) {
                 Ok(res) => res,
                 Err(err) => {
                     Output::error(&format!(
                         "Failed to read {} : {}",
                         file_name,
-                        err.to_string()
+                        err
                     ));
                     std::process::exit(1);
                 }
             };
             s.ip_list = ips.lines().map(|s| Value::String(s.to_string())).collect();
         }
-        if query_string != "" {
-            s.query = format!("{}", query_string);
+        if !query_string.is_empty() {
+            s.query = query_string.to_string();
             Output::info(&format!("Search with {}", query_string));
         } else {
             Output::info(&format!("Search for {} IPs", s.ip_list.len()));
@@ -267,7 +268,7 @@ impl Quake {
         let response: Value = match Quake::new(res).search(s) {
             Ok(response) => response,
             Err(e) => {
-                Output::error(&format!("Query failed: {}", e.to_string()));
+                Output::error(&format!("Query failed: {}", e));
                 std::process::exit(1);
             }
         };
@@ -293,7 +294,7 @@ impl Quake {
                 if e.is_timeout() {
                     Output::error("Connect Timeout!!");
                 } else {
-                    Output::error(&format!("Connect error!!!\r\n{}", e.to_string()));
+                    Output::error(&format!("Connect error!!!\r\n{}", e));
                 }
                 std::process::exit(1);
             }
@@ -304,7 +305,7 @@ impl Quake {
                 if e.is_timeout() {
                     Output::error("Connect Timeout!!");
                 } else {
-                    Output::error(&format!("Connect error!!!\r\n{}", e.to_string()));
+                    Output::error(&format!("Connect error!!!\r\n{}", e));
                 }
                 std::process::exit(1);
             }
@@ -337,7 +338,7 @@ impl Quake {
                 if e.is_timeout() {
                     Output::error("Connect Timeout!!");
                 } else {
-                    Output::error(&format!("Connect error!!!\r\n{}", e.to_string()));
+                    Output::error(&format!("Connect error!!!\r\n{}", e));
                 }
                 std::process::exit(1);
             }
@@ -348,7 +349,7 @@ impl Quake {
                 if e.is_timeout() {
                     Output::error("Connect Timeout!!");
                 } else {
-                    Output::error(&format!("Connect error!!!\r\n{}", e.to_string()));
+                    Output::error(&format!("Connect error!!!\r\n{}", e));
                 }
                 std::process::exit(1);
             }
@@ -356,6 +357,7 @@ impl Quake {
         res
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn init_scroll(
         query_string: &str,
         size: i32,
@@ -400,30 +402,31 @@ impl Quake {
                 .push(Value::String("610ce2fbda6d29df72ac56eb".to_string()));
         }
         let (local, one_years_ago) = crate::models::getdate();
-        if time_start == "" && time_end == "" {
+        if time_start.is_empty() && time_end.is_empty() {
             s.start_time = one_years_ago;
             s.end_time = local;
-        } else if time_start != "" && time_end == "" {
+        } else if !time_start.is_empty() && time_end.is_empty() {
             s.start_time = time_start.to_string();
             s.end_time = local;
-        } else if time_start == "" && time_end != "" {
+        } else if time_start.is_empty() && !time_end.is_empty() {
             s.start_time = crate::models::getdate_for_manual(time_end);
             s.end_time = time_end.to_string();
-        } else if time_start != "" && time_end != "" {
+        } else if !time_start.is_empty() && !time_end.is_empty() {
             s.start_time = time_start.to_string();
             s.end_time = time_end.to_string();
         }
-        if query_string != "" {
-            s.query = format!("{}", query_string);
+        if !query_string.is_empty() {
+            s.query = query_string.to_string();
         } else {
             Output::info(&format!("Search for {} IPs", s.ip_list.len()));
         }
-        if pagination_id != "" {
-            s.pagination_id = format!("{}", pagination_id);
+        if !pagination_id.is_empty() {
+            s.pagination_id = pagination_id.to_string();
         }
         s
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn query_for_scroll(
         query_string: &str,
         size: i32,
@@ -449,7 +452,7 @@ impl Quake {
         ) {
             Ok(response) => response,
             Err(e) => {
-                Output::error(&format!("Query failed: {}", e.to_string()));
+                Output::error(&format!("Query failed: {}", e));
                 std::process::exit(1);
             }
         };
@@ -457,6 +460,7 @@ impl Quake {
         response
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn scroll(
         &self,
         query_string: &str,
@@ -533,7 +537,7 @@ impl Quake {
                 if e.is_timeout() {
                     Output::error("Connect Timeout!!");
                 } else {
-                    Output::error(&format!("Connect error!!!\r\n{}", e.to_string()));
+                    Output::error(&format!("Connect error!!!\r\n{}", e));
                 }
                 std::process::exit(1);
             }
@@ -566,7 +570,7 @@ impl Quake {
                 if e.is_timeout() {
                     Output::error("Connect Timeout!!");
                 } else {
-                    Output::error(&format!("Connect error!!!\r\n{}", e.to_string()));
+                    Output::error(&format!("Connect error!!!\r\n{}", e));
                 }
                 std::process::exit(1);
             }

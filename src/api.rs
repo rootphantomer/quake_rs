@@ -76,11 +76,7 @@ impl ApiKey {
             end_time: local,
             shortcuts: Vec::new(),
         };
-        let res = match Quake::new(apikey).search(s) {
-            Ok(_) => true,
-            Err(_) => false,
-        };
-        res
+         Quake::new(apikey).search(s).is_ok()
     }
 
     /// 检查 GPT API 密钥是否可用
@@ -100,13 +96,10 @@ impl ApiKey {
     /// - `path`: 要创建的目录路径
     fn create_config_dir(path: &str) {
         if !Path::exists(Path::new(path)) {
-            match create_dir(Path::new(path)) {
-                Err(e) => {
-                    Output::error(&format!("创建路径失败: {}. {}", path, e.to_string()));
-                    std::process::exit(1);
-                }
-                _ => {}
-            }
+             if let Err(e) = create_dir(Path::new(path)) {
+                 Output::error(&format!("创建路径失败: {}. {}", path, e));
+                 std::process::exit(1);
+             }
         }
     }
 
@@ -130,14 +123,14 @@ impl ApiKey {
             let mut file: File = match File::create(Path::new(&api_path)) {
                 Ok(f) => f,
                 Err(e) => {
-                    Output::error(&format!("文件创建失败: {}", e.to_string()));
+                     Output::error(&format!("文件创建失败: {}", e));
                     std::process::exit(1);
                 }
             };
             return match file.write_all(apikey.as_bytes()) {
                 Ok(_) => true,
                 Err(e) => {
-                    Output::error(&format!("文件写入失败: {}", e.to_string()));
+                     Output::error(&format!("文件写入失败: {}", e));
                     std::process::exit(1);
                 }
             };
@@ -174,14 +167,14 @@ impl ApiKey {
             let mut file: File = match File::create(Path::new(&api_path)) {
                 Ok(f) => f,
                 Err(e) => {
-                    Output::error(&format!("文件创建失败: {}", e.to_string()));
+                     Output::error(&format!("文件创建失败: {}", e));
                     std::process::exit(1);
                 }
             };
             return match file.write_all(apikey.as_bytes()) {
                 Ok(_) => true,
                 Err(e) => {
-                    Output::error(&format!("文件写入失败: {}", e.to_string()));
+                     Output::error(&format!("文件写入失败: {}", e));
                     std::process::exit(1);
                 }
             };

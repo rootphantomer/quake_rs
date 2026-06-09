@@ -82,7 +82,7 @@ pub fn show(
             },
         };
         let mut regex_data = String::new();
-        if filter != "" {
+        if !filter.is_empty() {
             let cert = data_value["service"]["cert"].as_str().unwrap_or("");
             let response = data_value["service"]["response"].as_str().unwrap_or("");
             let http_body = data_value["service"]["http"]["body"].as_str().unwrap_or("");
@@ -155,6 +155,7 @@ pub fn show(
     res
 }
 
+    #[allow(clippy::needless_range_loop)]
 pub fn show_scroll(
     value: Vec<Value>,
     showdata: bool,
@@ -201,7 +202,7 @@ pub fn show_scroll(
             },
         };
         let mut regex_data = String::new();
-        if filter != "" {
+        if !filter.is_empty() {
             let cert = data_value["service"]["cert"].as_str().unwrap_or("");
             let response = data_value["service"]["response"].as_str().unwrap_or("");
             let http_body = data_value["service"]["http"]["body"].as_str().unwrap_or("");
@@ -307,7 +308,7 @@ pub fn show_host(mut value: Value, show_data: bool) -> Vec<String> {
                 width = 20
             ));
         }
-        info.push_str("\n");
+        info.push('\n');
         if show_data {
             println!("{}", info);
         }
@@ -316,6 +317,7 @@ pub fn show_host(mut value: Value, show_data: bool) -> Vec<String> {
     res
 }
 
+    #[allow(clippy::needless_range_loop)]
 pub fn show_host_by_scroll(value: Vec<Value>, show_data: bool) -> Vec<String> {
     let mut res: Vec<String> = Vec::new();
     let count = value.len();
@@ -354,7 +356,7 @@ pub fn show_host_by_scroll(value: Vec<Value>, show_data: bool) -> Vec<String> {
                 width = 20
             ));
         }
-        info.push_str("\n");
+        info.push('\n');
         if show_data {
             println!("{}", info);
         }
@@ -443,7 +445,7 @@ pub fn show_info(info: Value) {
         for r in role {
             let r = r["fullname"].as_str().unwrap_or("");
             role_info.push_str(r);
-            role_info.push_str(",");
+            role_info.push(',');
         }
         role_info.remove(role_info.len() - 1);
         Output::info(&format!("角  色:  {}", role_info));
@@ -467,7 +469,7 @@ pub fn show_info_jf(info: Value) {
 /// 参数为已获取的 aggservice 响应数据（Value 类型）
 pub fn display_honeypot(response: Value) {
     let app = response["data"]["app"].as_array().unwrap();
-    if app.len() > 0 {
+    if !app.is_empty() {
         let app_name = app[0].as_object().unwrap();
         let honeypot = app_name["key"]
             .as_str()
