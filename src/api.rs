@@ -6,9 +6,9 @@ use std::path::Path;
 use std::{fs, io};
 
 // 引入公共模块中的输出工具和服务结构体
-use crate::common::{Output, Service};
+use crate::models::{Output, Service};
 // 引入 Quake 模块中的 Quake 结构体
-use crate::quake::quake::Quake;
+use crate::client::Quake;
 // 引入写入操作的 trait
 use std::io::Write;
 
@@ -64,7 +64,7 @@ impl ApiKey {
     /// # 返回值
     /// 如果密钥可用返回 `true`，否则返回 `false`
     fn check_api(apikey: String) -> bool {
-        let (local, one_years_ago) = Quake::getdate();
+        let (local, one_years_ago) = crate::models::getdate();
         let s = Service {
             ip_list: Vec::new(),
             query: String::from("port:80"),

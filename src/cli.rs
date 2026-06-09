@@ -1,89 +1,16 @@
-// use std::process::Command;
+// CLI 层：命令行参数解析与子命令路由
+// 从 common.rs 迁移而来，移除过渡期 re-export
+
 use crate::api::ApiKey;
+use crate::client::Quake;
+use crate::display;
 use crate::gpt::Gpt;
-use crate::quake::quake::Quake;
-use ansi_term::Colour::{Blue, Green, Red, Yellow};
-use clap::{Arg, Command};
+use crate::models::{AggService, Output};
+use crate::persistence;
+use clap::{Arg, ArgAction, Command};
 use regex::Regex;
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::error::Error;
-/*
-  TODO: Comment
-*/
-// 派生序列化、反序列化和调试输出的 trait
-#[derive(Serialize, Deserialize, Debug)]
-/// 表示服务查询的结构体，包含查询所需的各种参数
-pub struct Service {
-    /// 查询语句，用于指定查询的条件
-    pub query: String,
-    /// 查询的起始位置，用于分页查询
-    pub start: i32,
-    /// 查询结果的数量，即每页返回的记录数
-    pub size: i32,
-    /// 是否忽略缓存，true 表示忽略缓存，直接从数据源查询
-    pub ignore_cache: bool,
-    /// 是否只查询最新数据，true 表示只返回最新的数据
-    pub latest: bool,
-    /// 查询的开始时间，格式通常为特定的时间字符串
-    pub start_time: String,
-    /// 查询的结束时间，格式通常为特定的时间字符串
-    pub end_time: String,
-    /// IP 地址列表，用于筛选特定 IP 相关的数据
-    pub ip_list: Vec<Value>,
-    /// 快捷方式列表，可能包含一些预设的查询条件或配置
-    pub shortcuts: Vec<Value>,
-}
-
-/*
-  TODO: Comment
-*/
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Scroll {
-    pub query: String,
-    pub size: i32,
-    pub ignore_cache: bool,
-    pub latest: bool,
-    pub pagination_id: String,
-    pub start_time: String,
-    pub end_time: String,
-    pub ip_list: Vec<Value>,
-    pub shortcuts: Vec<Value>,
-}
-
-/*
-  TODO: Comment
-*/
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Host {
-    pub query: String,
-    pub start: i32,
-    pub size: i32,
-    pub ignore_cache: bool,
-}
-
-/*
-  TODO: Comment
-*/
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ScrollHost {
-    pub query: String,
-    pub size: i32,
-    pub pagination_id: String,
-    pub ignore_cache: bool,
-}
-
-/*
-  TODO: Comment
-*/
-#[derive(Serialize, Deserialize, Debug)]
-pub struct AggService {
-    pub query: String,
-    pub start: i32,
-    pub size: i32,
-    pub ignore_cache: bool,
-    pub aggregation_list: Vec<String>,
-}
 
 pub struct ArgParse;
 
@@ -101,6 +28,7 @@ impl ArgParse {
                     .arg(
                         Arg::new("Api_Key")
                             .index(1)
+                            .action(ArgAction::Set)
                             .help("Initialize the Quake command-line")
                     )
             ).subcommand(
@@ -108,6 +36,7 @@ impl ArgParse {
                     .about("Initialize the gtpapi")
                     .arg(
                         Arg::new("gpt_Key")
+                            .action(ArgAction::Set)
                             .help("Initialize the gptapi")
                     )
             )
@@ -121,12 +50,14 @@ impl ArgParse {
                     .arg(
                         Arg::new("ip")
                             .index(1)
+                            .action(ArgAction::Set)
                             .help(" View all available information for an IP address")
                     )
                     .arg(
                         Arg::new("output")
                             .short('o')
                             .long("output")
+                            .action(ArgAction::Set)
                             .help("Save the host information in the given file (append if file exists).")
                             .value_name("FILENAME")
                     )
@@ -134,18 +65,21 @@ impl ArgParse {
                         Arg::new("query_host_file")
                             .short('q')
                             .long("query_host_file")
+                            .action(ArgAction::Set)
                             .help("Quake Host file(Only support --size); Example: quake search -q hosts.txt")
                             .value_name("FILENAME")
                     )
                     .arg(
                         Arg::new("size")
                             .long("size")
+                            .action(ArgAction::Set)
                             .value_name("NUMBER")
                             .help("The size of the number of responses, up to a maximum of 100 (Default 10).")
                     )
                     .arg(
                         Arg::new("start")
                             .long("start")
+                            .action(ArgAction::Set)
                             .value_name("NUMBER")
                             .help("Starting position of the query (Default 0).")
                     )
@@ -153,6 +87,7 @@ impl ArgParse {
                         Arg::new("type")
                             .short('t')
                             .long("type")
+                            .action(ArgAction::Set)
                             .value_name("TYPE")
                             .help("Fields displayed:ip,port,title,country,province,city,owner,time,ssldomain. (Default ip,port)")
                     )
@@ -163,12 +98,14 @@ impl ArgParse {
                     .arg(
                         Arg::new("query_string")
                             .index(1)
+                            .action(ArgAction::Set)
                             .help("Quake Querystring; Example: quake search 'port:80'")
                     )
                     .arg(
                         Arg::new("query_file")
                             .short('q')
                             .long("query_file")
+                            .action(ArgAction::Set)
                             .help("Quake Querystring file; Example: quake search -q test.txt")
                             .value_name("FILENAME")
                     )
@@ -176,6 +113,7 @@ impl ArgParse {
                         Arg::new("time_start")
                             .short('s')
                             .long("start_time")
+                            .action(ArgAction::Set)
                             .help("Search start time\r\n\
                             Example: quake search 'port:80' -s 2020-01-01")
                             .value_name("TIME START")
@@ -184,6 +122,7 @@ impl ArgParse {
                         Arg::new("time_end")
                             .short('e')
                             .long("end_time")
+                            .action(ArgAction::Set)
                             .help("Search end time\r\n\
                             Example: quake search 'port:80' -e 2020-01-01")
                             .value_name("TIME END")
@@ -192,6 +131,7 @@ impl ArgParse {
                         Arg::new("upload")
                             .short('u')
                             .long("upload")
+                            .action(ArgAction::Set)
                             .help("Uploading *.txt files containing only IP addresses, with no more than 1000 IPs.\r\n\
                             Example: quake search -u ips.txt")
                             .value_name("IP File")
@@ -200,18 +140,21 @@ impl ArgParse {
                         Arg::new("output")
                             .short('o')
                             .long("output")
+                            .action(ArgAction::Set)
                             .help("Save the host information in the given file (append if file exists).")
                             .value_name("FILENAME")
                     )
                     .arg(
                         Arg::new("size")
                             .long("size")
+                            .action(ArgAction::Set)
                             .value_name("NUMBER")
                             .help("The size of the number of responses, up to a maximum of 100 (Default 10).")
                     )
                     .arg(
                         Arg::new("start")
                             .long("start")
+                            .action(ArgAction::Set)
                             .value_name("NUMBER")
                             .help("Starting position of the query (Default 0).")
                     )
@@ -219,6 +162,7 @@ impl ArgParse {
                         Arg::new("type")
                             .short('t')
                             .long("type")
+                            .action(ArgAction::Set)
                             .value_name("TYPE")
                             .help("Fields displayed:ip,port,title,product_name_cn,version,protocol,country,province,city,owner,time,ssldomain,domain. (Default ip,port)")
                     )
@@ -226,6 +170,7 @@ impl ArgParse {
                         Arg::new("filter")
                             .short('f')
                             .long("filter")
+                            .action(ArgAction::Set)
                             .value_name("TYPE")
                             .help("Filter search results with more regular expressions.\r\n\
                             Example: quake search 'app:\"exchange 2010\"' -t ip,port,title -f \"X-OWA-Version: (.*)\"")
@@ -233,26 +178,31 @@ impl ArgParse {
                     .arg(Arg::new("cdn")
                         .short('c')
                         .long("cdn")
+                        .action(ArgAction::Set)
                         .value_name("NUMBER")
                         .help("Exclude cdn data when parameter is 1,Not excluded by default"))
                     .arg(Arg::new("honey_jar")
                         .short('m')
                         .long("honey_jar")
+                        .action(ArgAction::Set)
                         .value_name("NUMBER")
                         .help("Exclude honey_jar data when parameter is 1,Not excluded by default"))
                     .arg(Arg::new("latest_data")
                         .short('l')
                         .long("latest_data")
+                        .action(ArgAction::Set)
                         .value_name("NUMBER")
                         .help("Display latest data when parameter is 1,Not up to date by default"))
                     .arg(Arg::new("filter_request")
                         .short('r')
                         .long("filter_request")
+                        .action(ArgAction::Set)
                         .value_name("NUMBER")
                         .help("When the parameter is 1, invalid requests are filtered, such as 400, 401, 403 and other request data, the default is not filtered"))
                     .arg(Arg::new("deduplication")
                         .short('d')
                         .long("deduplication")
+                        .action(ArgAction::Set)
                         .value_name("NUMBER")
                         .help("When the parameter is 1, data deduplication is performed, and no deduplication is performed by default."))
             )
@@ -262,22 +212,26 @@ impl ArgParse {
                     .arg(Arg::new("cdn")
                         .short('n')
                         .long("cdn")
+                        .action(ArgAction::Set)
                         .value_name("NUMBER")
                         .help("Exclude cdn data when parameter is 1,Not excluded by default"))
                     .arg(Arg::new("honey_jar")
                         .short('m')
                         .long("honey_jar")
+                        .action(ArgAction::Set)
                         .value_name("NUMBER")
                         .help("Exclude honey_jar data when parameter is 1,Not excluded by default"))
                     .arg(Arg::new("latest_data")
                         .short('l')
                         .long("latest_data")
+                        .action(ArgAction::Set)
                         .value_name("NUMBER")
                         .help("Display latest data when parameter is 1,Not up to date by default"))
 
                     .arg(
                         Arg::new("domain_name")
                             .index(1)
+                            .action(ArgAction::Set)
                             .value_name("DOMAIN_NAME")
                             .help("The domain name to be queried.")
                     )
@@ -285,18 +239,21 @@ impl ArgParse {
                         Arg::new("count")
                             .short('c')
                             .long("count")
+                            .action(ArgAction::Set)
                             .value_name("NUMBER")
                             .help("Count of results")
                     )
                     .arg(
                         Arg::new("size")
                             .long("size")
+                            .action(ArgAction::Set)
                             .value_name("NUMBER")
                             .help("The size of the number of responses, up to a maximum of 100 (Default 10).")
                     )
                     .arg(
                         Arg::new("start")
                             .long("start")
+                            .action(ArgAction::Set)
                             .value_name("NUMBER")
                             .help("Starting position of the query (Default 0).")
                     )
@@ -304,6 +261,7 @@ impl ArgParse {
                         Arg::new("output")
                             .short('o')
                             .long("output")
+                            .action(ArgAction::Set)
                             .value_name("FILENAME")
                             .help("Output result to file.")
                     )
@@ -311,17 +269,20 @@ impl ArgParse {
                         Arg::new("type")
                             .short('t')
                             .long("type")
+                            .action(ArgAction::Set)
                             .value_name("TYPE")
                             .help("Fields displayed:domain,ip,port,title. (Default domain, ip, port)")
                     )
                     .arg(Arg::new("filter_request")
                         .short('r')
                         .long("filter_request")
+                        .action(ArgAction::Set)
                         .value_name("NUMBER")
                         .help("When the parameter is 1, invalid requests are filtered, such as 400, 401, 403 and other request data, the default is not filtered"))
                     .arg(Arg::new("deduplication")
                         .short('d')
                         .long("deduplication")
+                        .action(ArgAction::Set)
                         .value_name("NUMBER")
                         .help("When the parameter is 1, data deduplication is performed, and no deduplication is performed by default."))
             )
@@ -331,6 +292,7 @@ impl ArgParse {
                     .arg(
                         Arg::new("ip")
                             .index(1)
+                            .action(ArgAction::Set)
                             .value_name("ip")
                             .help("The ip address to be queried.")
                     )
@@ -340,11 +302,13 @@ impl ArgParse {
                     .arg(
                         Arg::new("gpt_match")
                             .index(1)
+                            .action(ArgAction::Set)
                             .value_name("GPT_MATVH")
                             .help("what to say")
                     ).arg(
                         Arg::new("size")
                             .long("size")
+                            .action(ArgAction::Set)
                             .value_name("NUMBER")
                             .help("The size of the number of responses, up to a maximum of 100 (Default 10).")
                     )
@@ -353,18 +317,18 @@ impl ArgParse {
 
         match matches.subcommand() {
             Some(("init", init_match)) => {
-                if let Some(api_key) = init_match.get_many::<String>("Api_Key") {
-                    ApiKey::init(api_key.map(|s| s.as_str()).collect::<Vec<_>>().join(", "));
+                if let Some(api_key) = init_match.get_one::<String>("Api_Key") {
+                    ApiKey::init(api_key.to_string());
                 }
             }
             Some(("gptinit", init_match)) => {
-                if let Some(api_key) = init_match.get_many::<String>("gpt_Key") {
-                    ApiKey::gptinit(api_key.map(|s| s.as_str()).collect::<Vec<_>>().join(", "));
+                if let Some(api_key) = init_match.get_one::<String>("gpt_Key") {
+                    ApiKey::gptinit(api_key.to_string());
                 }
             }
             Some(("domain", domain_match)) => {
-                let domain = match domain_match.get_many::<String>("domain_name") {
-                    Some(domain) => domain.map(|s| s.as_str()).collect::<Vec<_>>().join(", "),
+                let domain = match domain_match.get_one::<String>("domain_name") {
+                    Some(domain) => domain.to_string(),
                     None => {
                         Output::error(
                             "Error: You must choose a domain name.\r\nPlease execute -h for help.",
@@ -372,109 +336,74 @@ impl ArgParse {
                         std::process::exit(1);
                     }
                 };
-                let start = match domain_match.get_many::<String>("start") {
-                    Some(start) => start
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let start = match domain_match.get_one::<String>("start") {
+                    Some(start) => start.parse::<i32>().unwrap(),
                     _ => 0,
                 };
-                let size = match domain_match.get_many::<String>("size") {
-                    Some(size) => size
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let size = match domain_match.get_one::<String>("size") {
+                    Some(size) => size.parse::<i32>().unwrap(),
                     _ => 10,
                 };
                 if size > 100 {
                     Output::warning("Warning: Size is set to a maximum of 100, if set too high it may cause abnormal slowdowns or timeouts.");
                 }
                 let query = &format!("domain:*.{}", domain);
-                let data_type_str = match domain_match.get_many::<String>("type") {
-                    Some(data_type_str) => data_type_str
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", "),
+                let data_type_str = match domain_match.get_one::<String>("type") {
+                    Some(data_type_str) => data_type_str.to_string(),
                     _ => "ip,port,domain".to_string(),
                 };
                 let data_type: Vec<&str> = data_type_str.split(',').collect();
 
-                let cdn = match domain_match.get_many::<String>("cdn") {
-                    Some(cdn) => cdn
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let cdn = match domain_match.get_one::<String>("cdn") {
+                    Some(cdn) => cdn.parse::<i32>().unwrap(),
                     _ => 0,
                 };
-                let mg = match domain_match.get_many::<String>("honey_jar") {
-                    Some(mg) => mg
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let mg = match domain_match.get_one::<String>("honey_jar") {
+                    Some(mg) => mg.parse::<i32>().unwrap(),
                     _ => 0,
                 };
-                let zxsj = match domain_match.get_many::<String>("latest_data") {
-                    Some(zxsj) => zxsj
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let zxsj = match domain_match.get_one::<String>("latest_data") {
+                    Some(zxsj) => zxsj.parse::<i32>().unwrap(),
                     _ => 0,
                 };
-                let wxqq = match domain_match.get_many::<String>("filter_request") {
-                    Some(wxqq) => wxqq
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let wxqq = match domain_match.get_one::<String>("filter_request") {
+                    Some(wxqq) => wxqq.parse::<i32>().unwrap(),
                     _ => 0,
                 };
-                let sjqc = match domain_match.get_many::<String>("deduplication") {
-                    Some(sjqc) => sjqc
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let sjqc = match domain_match.get_one::<String>("deduplication") {
+                    Some(sjqc) => sjqc.parse::<i32>().unwrap(),
                     _ => 0,
                 };
                 let response =
                     Quake::query(query, "", start, size, "", "", cdn, mg, zxsj, wxqq, sjqc);
 
-                let count = match domain_match.get_many::<String>("count") {
-                    Some(count) => count
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let count = match domain_match.get_one::<String>("count") {
+                    Some(count) => count.parse::<i32>().unwrap(),
                     _ => 0,
                 };
                 let mut onlycount = false;
                 if count > 0 {
                     onlycount = false;
                 }
-                let output = match domain_match.get_many::<String>("output") {
-                    Some(output) => output.map(|s| s.as_str()).collect::<Vec<_>>().join(", "),
+                let output = match domain_match.get_one::<String>("output") {
+                    Some(output) => output.to_string(),
                     None => {
-                        Quake::show_domain(response, onlycount, true, data_type);
-                        Quake::show_info_jf();
+                        display::show_domain(response, onlycount, true, data_type);
+                        let res = ApiKey::get_api().expect("Failed to read apikey:\t");
+                        let info_jf = match Quake::new(res).info() {
+                            Ok(value) => value,
+                            Err(e) => {
+                                Output::error(&format!("Query failed: {}", e.to_string()));
+                                std::process::exit(1);
+                            }
+                        };
+                        display::show_info_jf(info_jf);
                         std::process::exit(0);
                     }
                 };
                 let filename = &output;
                 // save to file.
-                match Quake::save_domain_data(filename, response, data_type) {
+                match persistence::save_domain_data(filename, response, data_type) {
                     Ok(count) => {
                         Output::success(&format!(
                             "Successfully saved {} pieces of data to {}",
@@ -487,38 +416,25 @@ impl ArgParse {
                 };
             }
             Some(("host", host_match)) => {
-                let query_host_file = match host_match.get_many::<String>("query_host_file") {
-                    Some(query_host_file) => query_host_file
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", "),
+                let query_host_file = match host_match.get_one::<String>("query_host_file") {
+                    Some(query_host_file) => query_host_file.to_string(),
                     None => "".to_string(),
                 };
                 let query_host_file = &query_host_file;
-                let start = match host_match.get_many::<String>("start") {
-                    Some(start) => start
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let start = match host_match.get_one::<String>("start") {
+                    Some(start) => start.parse::<i32>().unwrap(),
                     _ => 0,
                 };
-                let size = match host_match.get_many::<String>("size") {
-                    Some(size) => size
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let size = match host_match.get_one::<String>("size") {
+                    Some(size) => size.parse::<i32>().unwrap(),
                     _ => 10,
                 };
                 if size > 100 {
                     Output::warning("Warning: Size is set to a maximum of 100, if set too high it may cause abnormal slowdowns or timeouts.");
                 }
                 if query_host_file == "" {
-                    let ip = match host_match.get_many::<String>("ip") {
-                        Some(ip) => ip.map(|s| s.as_str()).collect::<Vec<_>>().join(", "),
+                    let ip = match host_match.get_one::<String>("ip") {
+                        Some(ip) => ip.to_string(),
                         None => {
                             Output::error(
                                 "Error: You must choose a ip or cidr.\r\nPlease execute -h for help.",
@@ -528,17 +444,25 @@ impl ArgParse {
                     };
                     let query = &format!("ip:{}", ip);
                     let response = Quake::query_host(query, start, size);
-                    let output = match host_match.get_many::<String>("output") {
-                        Some(name) => name.map(|s| s.as_str()).collect::<Vec<_>>().join(", "),
+                    let output = match host_match.get_one::<String>("output") {
+                        Some(name) => name.to_string(),
                         None => {
-                            Quake::show_host(response, true);
-                            Quake::show_info_jf();
+                            display::show_host(response, true);
+                            let res = ApiKey::get_api().expect("Failed to read apikey:\t");
+                            let info_jf = match Quake::new(res).info() {
+                                Ok(value) => value,
+                                Err(e) => {
+                                    Output::error(&format!("Query failed: {}", e.to_string()));
+                                    std::process::exit(1);
+                                }
+                            };
+                            display::show_info_jf(info_jf);
                             std::process::exit(0);
                         }
                     };
                     let filename = &output;
                     // save to file.
-                    match Quake::save_host_data(filename, response) {
+                    match persistence::save_host_data(filename, response) {
                         Ok(count) => {
                             Output::success(&format!(
                                 "Successfully saved {} pieces of data to {}",
@@ -550,23 +474,23 @@ impl ArgParse {
                         }
                     };
                 } else {
-                    let host_string = Quake::read_file_host(query_host_file);
+                    let host_string = persistence::read_file_host(query_host_file);
                     let query = host_string.as_str();
                     if query == "" {
                         Output::info(&format!("The host file is None!"));
                         std::process::exit(1);
                     }
                     let response = Quake::query_host_by_scroll(query, size);
-                    let output = match host_match.get_many::<String>("output") {
-                        Some(name) => name.map(|s| s.as_str()).collect::<Vec<_>>().join(", "),
+                    let output = match host_match.get_one::<String>("output") {
+                        Some(name) => name.to_string(),
                         None => {
-                            Quake::show_host_by_scroll(response, true);
+                            display::show_host_by_scroll(response, true);
                             std::process::exit(0);
                         }
                     };
                     let filename = &output;
                     // save to file
-                    match Quake::save_host_by_scroll_data(filename, response) {
+                    match persistence::save_host_by_scroll_data(filename, response) {
                         Ok(count) => {
                             Output::success(&format!(
                                 "Successfully saved {} pieces of data to {}",
@@ -580,28 +504,25 @@ impl ArgParse {
                 }
             }
             Some(("search", search_match)) => {
-                let upload = match search_match.get_many::<String>("upload") {
-                    Some(file_name) => file_name.map(|s| s.as_str()).collect::<Vec<_>>().join(", "),
+                let upload = match search_match.get_one::<String>("upload") {
+                    Some(file_name) => file_name.to_string(),
                     None => "".to_string(),
                 };
                 let upload = &upload;
-                let query_file = match search_match.get_many::<String>("query_file") {
-                    Some(query_file) => query_file
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", "),
+                let query_file = match search_match.get_one::<String>("query_file") {
+                    Some(query_file) => query_file.to_string(),
                     None => "".to_string(),
                 };
                 let query_file = &query_file;
                 let query_string;
-                let query = match search_match.get_many::<String>("query_string") {
-                    Some(query) => query.map(|s| s.as_str()).collect::<Vec<_>>().join(", "),
+                let query = match search_match.get_one::<String>("query_string") {
+                    Some(query) => query.to_string(),
                     None => {
                         if upload == "" && query_file == "" {
                             Output::error("Error: You must enter a search syntax.\r\nPlease execute -h for help.");
                             std::process::exit(1);
                         } else if query_file != "" {
-                            query_string = Quake::read_file_search(query_file);
+                            query_string = persistence::read_file_search(query_file);
                             query_string.to_string()
                         } else {
                             "".to_string()
@@ -609,95 +530,54 @@ impl ArgParse {
                     }
                 };
                 let query = &query;
-                let start = match search_match.get_many::<String>("start") {
-                    Some(start) => start
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let start = match search_match.get_one::<String>("start") {
+                    Some(start) => start.parse::<i32>().unwrap(),
                     _ => 0,
                 };
-                let size = match search_match.get_many::<String>("size") {
-                    Some(size) => size
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let size = match search_match.get_one::<String>("size") {
+                    Some(size) => size.parse::<i32>().unwrap(),
                     _ => 10,
                 };
-                let cdn = match search_match.get_many::<String>("cdn") {
-                    Some(cdn) => cdn
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let cdn = match search_match.get_one::<String>("cdn") {
+                    Some(cdn) => cdn.parse::<i32>().unwrap(),
                     _ => 0,
                 };
-                let mg = match search_match.get_many::<String>("honey_jar") {
-                    Some(mg) => mg
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let mg = match search_match.get_one::<String>("honey_jar") {
+                    Some(mg) => mg.parse::<i32>().unwrap(),
                     _ => 0,
                 };
-                let zxsj = match search_match.get_many::<String>("latest_data") {
-                    Some(zxsj) => zxsj
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let zxsj = match search_match.get_one::<String>("latest_data") {
+                    Some(zxsj) => zxsj.parse::<i32>().unwrap(),
                     _ => 0,
                 };
-                let wxqq = match search_match.get_many::<String>("filter_request") {
-                    Some(wxqq) => wxqq
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let wxqq = match search_match.get_one::<String>("filter_request") {
+                    Some(wxqq) => wxqq.parse::<i32>().unwrap(),
                     _ => 0,
                 };
-                let sjqc = match search_match.get_many::<String>("deduplication") {
-                    Some(sjqc) => sjqc
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let sjqc = match search_match.get_one::<String>("deduplication") {
+                    Some(sjqc) => sjqc.parse::<i32>().unwrap(),
                     _ => 0,
                 };
-                let time_start = match search_match.get_many::<String>("time_start") {
-                    Some(time_start) => time_start
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", "),
+                let time_start = match search_match.get_one::<String>("time_start") {
+                    Some(time_start) => time_start.to_string(),
                     None => "".to_string(),
                 };
                 let time_start = &time_start;
-                let time_end = match search_match.get_many::<String>("time_end") {
-                    Some(time_end) => time_end.map(|s| s.as_str()).collect::<Vec<_>>().join(", "),
+                let time_end = match search_match.get_one::<String>("time_end") {
+                    Some(time_end) => time_end.to_string(),
                     None => "".to_string(),
                 };
                 let time_end = &time_end;
                 if size > 100 {
                     Output::warning("Warning: Size is set to a maximum of 100, if set too high it may cause abnormal slowdowns or timeouts.");
                 }
-                let data_type_str = match search_match.get_many::<String>("type") {
-                    Some(data_type_str) => data_type_str
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", "),
+                let data_type_str = match search_match.get_one::<String>("type") {
+                    Some(data_type_str) => data_type_str.to_string(),
                     _ => "ip,port".to_string(),
                 };
                 let data_type: Vec<&str> = data_type_str.split(',').collect();
-                let filter = match search_match.get_many::<String>("filter") {
-                    Some(filter) => filter.map(|s| s.as_str()).collect::<Vec<_>>().join(", "),
+                let filter = match search_match.get_one::<String>("filter") {
+                    Some(filter) => filter.to_string(),
                     None => "".to_string(),
                 };
                 let filter = &filter;
@@ -705,17 +585,25 @@ impl ArgParse {
                     let response = Quake::query(
                         query, upload, start, size, time_start, time_end, cdn, mg, zxsj, wxqq, sjqc,
                     );
-                    let output = match search_match.get_many::<String>("output") {
-                        Some(name) => name.map(|s| s.as_str()).collect::<Vec<_>>().join(", "),
+                    let output = match search_match.get_one::<String>("output") {
+                        Some(name) => name.to_string(),
                         None => {
-                            Quake::show(response, true, filter, data_type);
-                            Quake::show_info_jf();
+                            display::show(response, true, filter, data_type);
+                            let res = ApiKey::get_api().expect("Failed to read apikey:\t");
+                            let info_jf = match Quake::new(res).info() {
+                                Ok(value) => value,
+                                Err(e) => {
+                                    Output::error(&format!("Query failed: {}", e.to_string()));
+                                    std::process::exit(1);
+                                }
+                            };
+                            display::show_info_jf(info_jf);
                             std::process::exit(0);
                         }
                     };
                     let output = &output;
                     // save to file.
-                    match Quake::save_search_data(output, response, filter, data_type) {
+                    match persistence::save_search_data(output, response, filter, data_type) {
                         Ok(count) => {
                             Output::success(&format!(
                                 "Successfully saved {} pieces of data to {}",
@@ -733,17 +621,17 @@ impl ArgParse {
                     let response = Quake::query_for_scroll(
                         query, size, time_start, time_end, cdn, mg, zxsj, wxqq, sjqc,
                     );
-                    // Quake::show_scroll(response,true,filter, data_type);
-                    let output = match search_match.get_many::<String>("output") {
-                        Some(name) => name.map(|s| s.as_str()).collect::<Vec<_>>().join(", "),
+                    // display::show_scroll(response,true,filter, data_type);
+                    let output = match search_match.get_one::<String>("output") {
+                        Some(name) => name.to_string(),
                         None => {
-                            Quake::show_scroll(response, true, filter, data_type);
+                            display::show_scroll(response, true, filter, data_type);
                             std::process::exit(0);
                         }
                     };
                     let output = &output;
                     // save to file.
-                    match Quake::save_scroll_data(output, response, filter, data_type) {
+                    match persistence::save_scroll_data(output, response, filter, data_type) {
                         Ok(count) => {
                             Output::success(&format!(
                                 "Successfully saved {} pieces of data to {}",
@@ -757,12 +645,20 @@ impl ArgParse {
                 }
             }
             Some(("info", _)) => {
-                Quake::show_info();
+                let res = ApiKey::get_api().expect("Failed to read apikey:\t");
+                let info = match Quake::new(res).info() {
+                    Ok(value) => value,
+                    Err(e) => {
+                        Output::error(&format!("Query failed: {}", e.to_string()));
+                        std::process::exit(1);
+                    }
+                };
+                display::show_info(info);
             }
             //gpt引擎
             Some(("gpt", gpt_match)) => {
-                let gptcs = match gpt_match.get_many::<String>("gpt_match") {
-                    Some(gptcs) => gptcs.map(|s| s.as_str()).collect::<Vec<_>>().join(", "),
+                let gptcs = match gpt_match.get_one::<String>("gpt_match") {
+                    Some(gptcs) => gptcs.to_string(),
                     None => {
                         Output::error("You have to say something. \r\nPlease execute -h for help.");
                         std::process::exit(1);
@@ -782,34 +678,16 @@ impl ArgParse {
                         Err(err.into())
                     }
                 };
-                let upload = match gpt_match.get_many::<String>("upload") {
-                    Some(file_name) => file_name.map(|s| s.as_str()).collect::<Vec<_>>().join(", "),
+                let upload = match gpt_match.get_one::<String>("upload") {
+                    Some(file_name) => file_name.to_string(),
                     None => "".to_string(),
                 };
                 let upload = &upload;
-                let query_file = match gpt_match.get_many::<String>("query_file") {
-                    Some(query_file) => query_file
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", "),
+                let query_file = match gpt_match.get_one::<String>("query_file") {
+                    Some(query_file) => query_file.to_string(),
                     None => "".to_string(),
                 };
                 let query_file = &query_file;
-                //let query_string;
-                // let query = match gpt_match.get_many::<String>("query_string") {
-                //     Some(query) => query.map(|s| s.as_str()).collect::<Vec<_>>().join(", "),
-                //     None => {
-                //         if upload == "" && query_file == "" {
-                //             Output::error("Error: You must enter a search syntax.\r\nPlease execute -h for help.");
-                //             std::process::exit(1);
-                //         } else if query_file != "" {
-                //             query_string = Quake::read_file_search(query_file);
-                //             query_string.to_string()
-                //         } else {
-                //             "".to_string()
-                //         }
-                //     }
-                // };
                 let query = gpt_sj.unwrap().trim_matches('"').replace("\\", "");
 
                 let sizere = Regex::new(r"--size\s+(\d+)").unwrap();
@@ -840,59 +718,29 @@ impl ArgParse {
                     None => "".to_string(),
                 };
                 let time_end = &time_end;
-                let start = match gpt_match.get_many::<String>("start") {
-                    Some(start) => start
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let start = match gpt_match.get_one::<String>("start") {
+                    Some(start) => start.parse::<i32>().unwrap(),
                     _ => 0,
                 };
 
-                let cdn = match gpt_match.get_many::<String>("cdn") {
-                    Some(cdn) => cdn
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let cdn = match gpt_match.get_one::<String>("cdn") {
+                    Some(cdn) => cdn.parse::<i32>().unwrap(),
                     _ => 0,
                 };
-                let mg = match gpt_match.get_many::<String>("honey_jar") {
-                    Some(mg) => mg
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let mg = match gpt_match.get_one::<String>("honey_jar") {
+                    Some(mg) => mg.parse::<i32>().unwrap(),
                     _ => 0,
                 };
-                let zxsj = match gpt_match.get_many::<String>("latest_data") {
-                    Some(zxsj) => zxsj
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let zxsj = match gpt_match.get_one::<String>("latest_data") {
+                    Some(zxsj) => zxsj.parse::<i32>().unwrap(),
                     _ => 0,
                 };
-                let wxqq = match gpt_match.get_many::<String>("filter_request") {
-                    Some(wxqq) => wxqq
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let wxqq = match gpt_match.get_one::<String>("filter_request") {
+                    Some(wxqq) => wxqq.parse::<i32>().unwrap(),
                     _ => 0,
                 };
-                let sjqc = match gpt_match.get_many::<String>("deduplication") {
-                    Some(sjqc) => sjqc
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                        .parse::<i32>()
-                        .unwrap(),
+                let sjqc = match gpt_match.get_one::<String>("deduplication") {
+                    Some(sjqc) => sjqc.parse::<i32>().unwrap(),
                     _ => 0,
                 };
 
@@ -911,16 +759,13 @@ impl ArgParse {
                     Output::warning("Warning: Size is set to a maximum of 100, if set too high it may cause abnormal slowdowns or timeouts.");
                 }
 
-                let data_type_str = match gpt_match.get_many::<String>("type") {
-                    Some(data_type_str) => data_type_str
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", "),
+                let data_type_str = match gpt_match.get_one::<String>("type") {
+                    Some(data_type_str) => data_type_str.to_string(),
                     _ => "ip,port".to_string(),
                 };
                 let data_type: Vec<&str> = data_type_str.split(',').collect();
-                let filter = match gpt_match.get_many::<String>("filter") {
-                    Some(filter) => filter.map(|s| s.as_str()).collect::<Vec<_>>().join(", "),
+                let filter = match gpt_match.get_one::<String>("filter") {
+                    Some(filter) => filter.to_string(),
                     None => "".to_string(),
                 };
                 let filter = &filter;
@@ -934,20 +779,13 @@ impl ArgParse {
                             size.parse::<String>().unwrap()
                         }
                         None => {
-                            Quake::show(response, true, filter, data_type);
+                            display::show(response, true, filter, data_type);
                             std::process::exit(0);
                         }
                     };
-                    // let output = match gpt_match.get_many::<String>("output") {
-                    //     Some(name) => name.map(|s| s.as_str()).collect::<Vec<_>>().join(", "),
-                    //     None => {
-                    //         Quake::show(response, true, filter, data_type);
-                    //         std::process::exit(0);
-                    //     }
-                    // };
                     let output = &output;
                     // save to file.
-                    match Quake::save_search_data(output, response, filter, data_type) {
+                    match persistence::save_search_data(output, response, filter, data_type) {
                         Ok(count) => {
                             Output::success(&format!(
                                 "Successfully saved {} pieces of data to {}",
@@ -965,17 +803,17 @@ impl ArgParse {
                     let response = Quake::query_for_scroll(
                         query, size, time_start, time_end, cdn, mg, zxsj, wxqq, sjqc,
                     );
-                    // Quake::show_scroll(response,true,filter, data_type);
-                    let output = match gpt_match.get_many::<String>("output") {
-                        Some(name) => name.map(|s| s.as_str()).collect::<Vec<_>>().join(", "),
+                    // display::show_scroll(response,true,filter, data_type);
+                    let output = match gpt_match.get_one::<String>("output") {
+                        Some(name) => name.to_string(),
                         None => {
-                            Quake::show_scroll(response, true, filter, data_type);
+                            display::show_scroll(response, true, filter, data_type);
                             std::process::exit(0);
                         }
                     };
                     let output = &output;
                     // save to file.
-                    match Quake::save_scroll_data(output, response, filter, data_type) {
+                    match persistence::save_scroll_data(output, response, filter, data_type) {
                         Ok(count) => {
                             Output::success(&format!(
                                 "Successfully saved {} pieces of data to {}",
@@ -989,8 +827,8 @@ impl ArgParse {
                 }
             }
             Some(("honeypot", honeypot_match)) => {
-                let ip = match honeypot_match.get_many::<String>("ip") {
-                    Some(query) => query.map(|s| s.as_str()).collect::<Vec<_>>().join(", "),
+                let ip = match honeypot_match.get_one::<String>("ip") {
+                    Some(query) => query.to_string(),
                     None => {
                         Output::error(
                             "Error: You must choose a ip.\r\nPlease execute -h for help.",
@@ -998,26 +836,27 @@ impl ArgParse {
                         std::process::exit(1);
                     }
                 };
-                Quake::honeypot(ip.to_string());
+                Output::info(&format!("Search with {}", ip));
+                let mut query = String::from("app: \"*蜜罐*\" AND ip:");
+                query += &ip;
+                let res = ApiKey::get_api().expect("Failed to read apikey:\t");
+                let s = AggService {
+                    query,
+                    start: 0,
+                    size: 5,
+                    ignore_cache: false,
+                    aggregation_list: vec![String::from("app")],
+                };
+                let response: Value = match Quake::new(res).aggservice(&s) {
+                    Ok(response) => response,
+                    Err(e) => {
+                        Output::error(&format!("Query failed: {}", e.to_string()));
+                        std::process::exit(1);
+                    }
+                };
+                display::display_honeypot(response);
             }
             _ => {}
         }
-    }
-}
-
-pub struct Output;
-
-impl Output {
-    pub fn error(msg: &str) {
-        println!("{} {}", Red.bold().paint("[!]"), msg);
-    }
-    pub fn info(msg: &str) {
-        println!("{} {}", Blue.bold().paint("[+]"), msg);
-    }
-    pub fn success(msg: &str) {
-        println!("{} {}", Green.bold().paint("[+]"), msg);
-    }
-    pub fn warning(msg: &str) {
-        println!("{} {}", Yellow.bold().paint("[-]"), msg);
     }
 }

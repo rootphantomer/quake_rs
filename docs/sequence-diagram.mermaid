@@ -1,0 +1,45 @@
+sequenceDiagram
+    participant User as 用户
+    participant main as main.rs
+    participant cli as cli.rs (ArgParse)
+    participant client as client.rs (Quake)
+    participant api as api.rs (ApiKey)
+    participant display as display.rs
+    participant persist as persistence.rs
+
+    Note over User,persist: 搜索流程 (search 子命令)
+    User->>main: quake search "port:80" -o result.txt
+    main->>cli: ArgParse::parse()
+    cli->>cli: 构建 Command + 解析参数
+    cli->>client: Quake::query("port:80", "", 0, 10, ...)
+    Note over client: 内部：ApiKey::get_api() → 构建 Service → search()
+    client->>api: ApiKey::get_api()
+    api-->>client: api_key
+    client->>client: search(service) [HTTP POST]
+    client-->>cli: response (Value)
+    cli->>persist: save_search_data("result.txt", response, filter, data_type)
+    persist->>display: show(response, false, filter, data_type) [获取格式化字符串]
+    display-->>persist: Vec&lt;String&gt;
+    persist->>persist: 写入文件
+    persist-->>cli: Ok(count)
+    cli->>cli: Output::success("Successfully saved...")
+
+    Note over User,persist: 初始化流程 (init 子命令)
+    User->>main: quake init &lt;API_KEY&gt;
+    main->>cli: ArgParse::parse()
+    cli->>api: ApiKey::init(api_key)
+    api->>api: set_api(api_key)
+    api->>api: check_api(api_key)
+    api->>client: Quake::new(api_key).search(service)
+    client-->>api: Result
+    api->>api: 写入 ~/.config/quake/api_key
+    api-->>cli: 成功/失败
+
+    Note over User,persist: GPT 智能搜索流程
+    User->>main: quake gpt "搜索Apache服务器"
+    main->>cli: ArgParse::parse()
+    cli->>cli: Gpt::query_gpt("搜索Apache服务器")
+    cli->>cli: 解析 GPT 返回的参数
+    cli->>client: Quake::query(parsed_query, ...)
+    client-->>cli: response
+    cli->>display: show(response, true, filter, data_type)

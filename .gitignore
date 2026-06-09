@@ -1,5 +1,20 @@
-/target
+# Build output
+/target/
+
+# IDE
 .idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# WorkBuddy
+.workbuddy/
+
+# Misc
 todo.md
 *.txt
-/node_modules

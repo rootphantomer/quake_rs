@@ -1,0 +1,135 @@
+classDiagram
+    class Service {
+        +String query
+        +i32 start
+        +i32 size
+        +bool ignore_cache
+        +bool latest
+        +String start_time
+        +String end_time
+        +Vec~Value~ ip_list
+        +Vec~Value~ shortcuts
+    }
+
+    class Scroll {
+        +String query
+        +i32 size
+        +bool ignore_cache
+        +bool latest
+        +String pagination_id
+        +String start_time
+        +String end_time
+        +Vec~Value~ ip_list
+        +Vec~Value~ shortcuts
+    }
+
+    class Host {
+        +String query
+        +i32 start
+        +i32 size
+        +bool ignore_cache
+    }
+
+    class ScrollHost {
+        +String query
+        +i32 size
+        +String pagination_id
+        +bool ignore_cache
+    }
+
+    class AggService {
+        +String query
+        +i32 start
+        +i32 size
+        +bool ignore_cache
+        +Vec~String~ aggregation_list
+    }
+
+    class Output {
+        +error(msg: &str)$
+        +info(msg: &str)$
+        +success(msg: &str)$
+        +warning(msg: &str)$
+    }
+
+    class Quake {
+        -String api_key
+        +new(api_key: String) Quake
+        +search(service: Service) Result~Value, Error~
+        +search_host(host: Host) Result~Value, Error~
+        +search_host_by_scroll(query_string: &str, size: i32) Result~Vec~Value~, Error~
+        +get_scroll_data(scroll: Scroll) String
+        +get_scroll_data_by_host(scrollhost: ScrollHost) String
+        +aggservice(agg: AggService) Result~Value, Error~
+        +info() Result~Value, Error~
+        +query(query_string, file_name, start, size, ...) Value
+        +query_host(query_string, start, size) Value
+        +query_host_by_scroll(query_string, size) Vec~Value~
+        +query_for_scroll(query_string, size, ...) Vec~Value~
+        +init_scroll(...) Scroll
+        +init_scroll_host(...) ScrollHost
+        -header() HeaderMap
+        -get_service_post_data(Service) Map
+        -get_scroll_post_data(Scroll) Map
+        -get_scrollhost_post_data(ScrollHost) Map
+    }
+
+    class ApiKey {
+        +init(api_key: String)
+        +gptinit(gpt_key: String)
+        +set_api(apikey: String) bool
+        +get_api() Result~String, io::Error~
+        +set_gptapi(apikey: String) bool
+        +get_gptapi() Result~String, io::Error~
+        -get_path() String
+        -check_api(apikey: String) bool
+        -check_gptapi(apikey: String) bool
+        -create_config_dir(path: &str)
+    }
+
+    class Gpt {
+        +query_gpt(query_string: &str) Result~String, Box~dyn Error~~
+    }
+
+    class ArgParse {
+        +parse()
+    }
+
+    class DisplayFunctions {
+        +show(value, showdata, filter, data_type) Vec~String~$
+        +show_scroll(value, showdata, filter, data_type) Vec~String~$
+        +show_host(value, show_data) Vec~String~$
+        +show_host_by_scroll(value, show_data) Vec~String~$
+        +show_domain(value, onlycount, showdata, data_type) Vec~String~$
+        +show_info(info: Value)$
+        +show_info_jf(info: Value)$
+        +display_honeypot(response: Value)$
+    }
+
+    class PersistenceFunctions {
+        +save_search_data(filename, content, filter, data_type) io::Result~i32~$
+        +save_host_data(filename, content) io::Result~i32~$
+        +save_domain_data(filename, content, data_type) io::Result~i32~$
+        +save_scroll_data(filename, content, filter, data_type) io::Result~i32~$
+        +save_host_by_scroll_data(filename, content) io::Result~i32~$
+        +read_file_search(filename) String$
+        +read_file_host(filename) String$
+    }
+
+    Quake --> Service : 请求体
+    Quake --> Host : 请求体
+    Quake --> Scroll : 请求体
+    Quake --> ScrollHost : 请求体
+    Quake --> AggService : 请求体
+    Quake --> ApiKey : 获取 api_key
+    ApiKey --> Quake : 验证 Key
+    ApiKey --> Output : 输出消息
+    ApiKey --> Service : 构建验证请求
+    ArgParse --> Quake : 调用查询方法
+    ArgParse --> DisplayFunctions : 调用展示函数
+    ArgParse --> PersistenceFunctions : 调用保存函数
+    ArgParse --> ApiKey : 调用 init
+    ArgParse --> Gpt : 调用 query_gpt
+    ArgParse --> Output : 输出消息
+    PersistenceFunctions --> DisplayFunctions : 复用格式化逻辑
+    DisplayFunctions --> Output : 输出消息
