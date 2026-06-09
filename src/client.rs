@@ -27,7 +27,7 @@ impl Quake {
             query: String::from(query_string),
             start,
             size,
-            ignore_cache: false,
+            ignore_cache: true,
         };
         let response: Value = match Quake::new(res).search_host(&h) {
             Ok(response) => response,
@@ -165,7 +165,7 @@ impl Quake {
         let mut sh = ScrollHost {
             query: "".to_string(),
             size,
-            ignore_cache: false,
+            ignore_cache: true,
             pagination_id: "".to_string(),
         };
         if !query_string.is_empty() {
@@ -199,8 +199,8 @@ impl Quake {
             query: "".to_string(),
             start,
             size,
-            ignore_cache: false,
-            latest: false,
+            ignore_cache: true,
+            latest: true,
             start_time: "".to_string(),
             end_time: "".to_string(),
             ip_list: vec![],
@@ -373,8 +373,8 @@ impl Quake {
         let mut s = Scroll {
             query: "".to_string(),
             size,
-            ignore_cache: false,
-            latest: false,
+            ignore_cache: true,
+            latest: true,
             pagination_id: "".to_string(),
             start_time: "".to_string(),
             end_time: "".to_string(),

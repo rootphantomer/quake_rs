@@ -573,7 +573,7 @@ impl ArgParse {
                 }
                 let data_type_str = match search_match.get_one::<String>("type") {
                     Some(data_type_str) => data_type_str.to_string(),
-                    _ => "ip,port".to_string(),
+                    _ => "ip,port,title".to_string(),
                 };
                 let data_type: Vec<&str> = data_type_str.split(',').collect();
                 let filter = match search_match.get_one::<String>("filter") {
@@ -761,7 +761,7 @@ impl ArgParse {
 
                 let data_type_str = match gpt_match.get_one::<String>("type") {
                     Some(data_type_str) => data_type_str.to_string(),
-                    _ => "ip,port".to_string(),
+                    _ => "ip,port,title".to_string(),
                 };
                 let data_type: Vec<&str> = data_type_str.split(',').collect();
                 let filter = match gpt_match.get_one::<String>("filter") {
