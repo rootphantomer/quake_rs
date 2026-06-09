@@ -1,5 +1,6 @@
 # Quake Command-Line Application
 
+[![Architecture](https://img.shields.io/badge/Architecture-Modular-green)]()
 [![Rust](https://img.shields.io/badge/Rust-1.70%2B-orange)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/360quake/quake_rs)](https://github.com/360quake/quake_rs/releases)
@@ -14,6 +15,29 @@
 - **honeypot** — 识别蜜罐系统
 - **info** — 查看账户信息与剩余积分
 - **gpt** — AI 自动将自然语言转换为 Quake 搜索语法
+
+## 项目架构
+
+```
+src/
+├── main.rs          # 入口点，模块声明与初始化
+├── models.rs        # 数据模型层（Service/Scroll/Host 等结构体 + Output 工具 + 时间函数）
+├── client.rs        # HTTP API 客户端（Quake 结构体，封装所有 API 请求）
+├── display.rs       # 数据展示层（格式化输出，show_* 系列独立函数）
+├── persistence.rs   # 持久化层（文件读写，save_*/read_file_* 独立函数）
+├── cli.rs           # CLI 层（clap 参数定义 + 子命令分发路由）
+├── api.rs           # API Key 管理（初始化、校验、存取）
+└── gpt.rs           # GPT 智能语法转换客户端
+```
+
+模块依赖关系：
+- `cli` → `client`, `display`, `persistence`, `api`, `gpt`, `models`
+- `client` → `models`, `api`
+- `display` → `models`
+- `persistence` → `display`
+- `api` → `models`, `client`
+- `gpt` → `api`, `models`
+- `models` → (无内部依赖)
 
 ## 安装
 
@@ -30,6 +54,12 @@ cargo build --release
 ```
 
 编译产物位于 `target/release/quake`。
+
+运行测试：
+
+```bash
+cargo test
+```
 
 ## 快速开始
 
@@ -166,6 +196,29 @@ quake gpt '来20个河南的linux服务器数据从2021年到2022年导出到当
 quake --help
 quake <subcommand> --help
 ```
+
+## 开发
+
+### 项目结构
+
+本项目采用模块化分层架构，各层职责分明：
+
+| 模块 | 职责 | 关键导出 |
+|------|------|---------|
+| `models` | 数据结构与工具函数 | `Service`, `Scroll`, `Host`, `Output`, `getdate` |
+| `client` | Quake API HTTP 客户端 | `Quake` |
+| `display` | 终端数据展示 | `show`, `show_host`, `show_domain`, `show_scroll` |
+| `persistence` | 文件 I/O | `save_*`, `read_file_*` |
+| `cli` | 命令行参数与路由 | `ArgParse` |
+| `api` | API Key 管理 | `ApiKey` |
+| `gpt` | GPT 语法转换 | `Gpt` |
+
+### 编码规范
+
+- Rust 2018 Edition
+- 展示逻辑（`display`）与业务逻辑（`client`）严格分离
+- 持久化操作集中在 `persistence` 模块
+- CLI 层负责编排，不包含业务逻辑
 
 ## 问题反馈
 

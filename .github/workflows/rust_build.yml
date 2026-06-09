@@ -18,7 +18,6 @@ jobs:
     name: "Tagged Release"
     runs-on: "ubuntu-latest"
     steps:
-      # ...
       # 检出代码到工作目录
       - name: Checkout Code
         # 使用固定版本的 action 以提高稳定性
@@ -35,13 +34,22 @@ jobs:
   # 上传资产的任务
   upload-assets:
     name: "Upload assets"
-    # 矩阵策略，在不同操作系统上运行任务
+    # 矩阵策略，在不同操作系统和目标平台上运行任务
     strategy:
       matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: universal-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
     runs-on: ${{ matrix.os }}
     steps:
       # 检出代码到工作目录
@@ -49,11 +57,12 @@ jobs:
         # 使用固定版本的 action 以提高稳定性
         uses: actions/checkout@v4
       # 上传 Rust 二进制文件
-      - name: "upload rust binary action"
+      - name: "Upload rust binary"
         uses: taiki-e/upload-rust-binary-action@v1
         with:
           ref: ${{ github.ref }}
           bin: quake
+          target: ${{ matrix.target }}
           tar: unix
           zip: windows
           token: ${{ secrets.GITHUB_TOKEN }}

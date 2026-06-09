@@ -18,7 +18,6 @@ jobs:
     # 指定运行该任务的环境为最新的 Ubuntu 系统
     runs-on: "ubuntu-latest"
     steps:
-      # ...
       # 检出代码到工作目录，使用固定版本 v4 提高稳定性
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -61,14 +60,18 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
       # 上传 Rust 二进制文件
-      - name: "upload rust binary action"
+      - name: "Upload rust binary"
         uses: taiki-e/upload-rust-binary-action@v1
         with:
           # 当前 Git 引用
           ref: ${{ github.ref }}
-          # 要上传的二进制文件路径
-          bin: ./target/release/quake
+          # 二进制文件名称
+          bin: quake
           # 目标平台
           target: ${{ matrix.target }}
+          # Unix 平台使用 tar 打包
+          tar: unix
+          # Windows 平台使用 zip 打包
+          zip: windows
           # 使用 GitHub 提供的令牌进行认证
           token: ${{ secrets.GITHUB_TOKEN }}
