@@ -41,10 +41,6 @@ src/
 
 ## 安装
 
-### 下载预编译二进制
-
-前往 [Releases](https://github.com/360quake/quake_rs/releases/) 页面下载对应平台的二进制文件。
-
 ### 从源码编译
 
 确保已安装 [Rust](https://www.rust-lang.org/tools/install)，然后执行：
@@ -97,6 +93,8 @@ quake search 'app:"exchange 2010"' -t ip,port,title -f "X-OWA-Version: (.*)"
 ```
 
 **search 支持的字段（`-t` 参数）**：
+> 默认输出字段为 `ip,port,title`，可通过 `-t` 自定义。
+
 
 | 字段 | 说明 |
 |------|------|
@@ -128,7 +126,7 @@ quake search 'app:"exchange 2010"' -t ip,port,title -f "X-OWA-Version: (.*)"
 | `-f, --filter` | 正则表达式过滤 |
 | `-c, --cdn` | 设为 1 排除 CDN 数据 |
 | `-m, --honey_jar` | 设为 1 排除蜜罐数据 |
-| `-l, --latest_data` | 设为 1 仅显示最新数据 |
+| `-l, --latest_data` | 设为 1 仅显示最新数据（默认已启用，可省略此参数） |
 | `-r, --filter_request` | 设为 1 过滤无效请求（400/401/403 等） |
 | `-d, --deduplication` | 设为 1 对数据去重 |
 
