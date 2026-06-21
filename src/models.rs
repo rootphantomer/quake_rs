@@ -126,3 +126,195 @@ pub fn getdate() -> (String, String) {
         one_years_ago.format("%Y-%m-%d %H:%M:%S").to_string(),
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========== getdate_for_manual 测试 ==========
+
+    #[test]
+    fn test_getdate_for_manual_normal_date() {
+        let result = getdate_for_manual("2024-01-01");
+        assert_eq!(result, "2023-01-01");
+    }
+
+    #[test]
+    fn test_getdate_for_manual_leap_year() {
+        // 2024-03-01 减去 365 天 → 2023-03-02 (因为 2024 是闰年)
+        let result = getdate_for_manual("2024-03-01");
+        assert_eq!(result, "2023-03-02");
+    }
+
+    #[test]
+    fn test_getdate_for_manual_year_boundary() {
+        // 2023-01-01 减去 365 天 → 2022-01-01
+        let result = getdate_for_manual("2023-01-01");
+        assert_eq!(result, "2022-01-01");
+    }
+
+    #[test]
+    fn test_getdate_for_manual_specific_date() {
+        // 2020 是闰年，2020-12-25 减去 365 天 → 2019-12-26
+        let result = getdate_for_manual("2020-12-25");
+        assert_eq!(result, "2019-12-26");
+    }
+
+    // ========== getdate 测试 ==========
+
+    #[test]
+    fn test_getdate_returns_two_strings() {
+        let (now, one_year_ago) = getdate();
+        assert!(!now.is_empty());
+        assert!(!one_year_ago.is_empty());
+    }
+
+    #[test]
+    fn test_getdate_format() {
+        let (now, one_year_ago) = getdate();
+        // 验证格式: YYYY-MM-DD HH:MM:SS
+        let parts: Vec<&str> = now.split(' ').collect();
+        assert_eq!(parts.len(), 2);
+        assert_eq!(parts[0].split('-').count(), 3);
+        assert_eq!(parts[1].split(':').count(), 3);
+        // 一年前的格式也应相同
+        let parts_ago: Vec<&str> = one_year_ago.split(' ').collect();
+        assert_eq!(parts_ago.len(), 2);
+    }
+
+    #[test]
+    fn test_getdate_one_year_diff() {
+        let (now, one_year_ago) = getdate();
+        let now_date = NaiveDate::parse_from_str(
+            now.split(' ').next().unwrap(),
+            "%Y-%m-%d",
+        )
+        .unwrap();
+        let ago_date = NaiveDate::parse_from_str(
+            one_year_ago.split(' ').next().unwrap(),
+            "%Y-%m-%d",
+        )
+        .unwrap();
+        let diff = now_date - ago_date;
+        assert!(diff.num_days() >= 364 && diff.num_days() <= 366);
+    }
+
+    // ========== Serde 序列化/反序列化测试 ==========
+
+    #[test]
+    fn test_service_serde_roundtrip() {
+        let s = Service {
+            query: "port:80".to_string(),
+            start: 0,
+            size: 10,
+            ignore_cache: true,
+            latest: false,
+            start_time: "2023-01-01 00:00:00".to_string(),
+            end_time: "2024-01-01 00:00:00".to_string(),
+            ip_list: vec![],
+            shortcuts: vec![],
+        };
+        let json = serde_json::to_string(&s).unwrap();
+        let deserialized: Service = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.query, "port:80");
+        assert_eq!(deserialized.start, 0);
+        assert_eq!(deserialized.size, 10);
+        assert!(deserialized.ignore_cache);
+        assert!(!deserialized.latest);
+    }
+
+    #[test]
+    fn test_scroll_serde_roundtrip() {
+        let s = Scroll {
+            query: "port:443".to_string(),
+            size: 20,
+            ignore_cache: false,
+            latest: true,
+            pagination_id: "abc123".to_string(),
+            start_time: "2023-06-01 00:00:00".to_string(),
+            end_time: "2024-06-01 00:00:00".to_string(),
+            ip_list: vec![],
+            shortcuts: vec![],
+        };
+        let json = serde_json::to_string(&s).unwrap();
+        let deserialized: Scroll = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.pagination_id, "abc123");
+        assert_eq!(deserialized.size, 20);
+    }
+
+    #[test]
+    fn test_host_serde_roundtrip() {
+        let h = Host {
+            query: "ip:1.1.1.1".to_string(),
+            start: 0,
+            size: 5,
+            ignore_cache: true,
+        };
+        let json = serde_json::to_string(&h).unwrap();
+        let deserialized: Host = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.query, "ip:1.1.1.1");
+        assert_eq!(deserialized.size, 5);
+    }
+
+    #[test]
+    fn test_scroll_host_serde_roundtrip() {
+        let sh = ScrollHost {
+            query: "ip:8.8.8.8".to_string(),
+            size: 10,
+            pagination_id: "page2".to_string(),
+            ignore_cache: false,
+        };
+        let json = serde_json::to_string(&sh).unwrap();
+        let deserialized: ScrollHost = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.pagination_id, "page2");
+        assert!(!deserialized.ignore_cache);
+    }
+
+    #[test]
+    fn test_agg_service_serde_roundtrip() {
+        let a = AggService {
+            query: "app:\"*蜜罐*\" AND ip:1.1.1.1".to_string(),
+            start: 0,
+            size: 5,
+            ignore_cache: false,
+            aggregation_list: vec!["app".to_string()],
+        };
+        let json = serde_json::to_string(&a).unwrap();
+        let deserialized: AggService = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.aggregation_list, vec!["app"]);
+        assert_eq!(deserialized.query, "app:\"*蜜罐*\" AND ip:1.1.1.1");
+    }
+
+    #[test]
+    fn test_service_with_ip_list() {
+        let s = Service {
+            query: String::new(),
+            start: 0,
+            size: 100,
+            ignore_cache: false,
+            latest: false,
+            start_time: String::new(),
+            end_time: String::new(),
+            ip_list: vec![
+                Value::String("1.1.1.1".to_string()),
+                Value::String("8.8.8.8".to_string()),
+            ],
+            shortcuts: vec![],
+        };
+        let json = serde_json::to_string(&s).unwrap();
+        let deserialized: Service = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.ip_list.len(), 2);
+        assert_eq!(deserialized.ip_list[0], Value::String("1.1.1.1".to_string()));
+    }
+
+    // ========== Output 结构体测试 ==========
+
+    #[test]
+    fn test_output_methods_exist() {
+        // 验证 Output 方法可以被调用（不验证输出内容）
+        Output::error("test error");
+        Output::info("test info");
+        Output::success("test success");
+        Output::warning("test warning");
+    }
+}

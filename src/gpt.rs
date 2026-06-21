@@ -213,3 +213,86 @@ impl Gpt {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========== remove_control_characters 测试 ==========
+
+    #[test]
+    fn test_remove_control_characters_empty() {
+        assert_eq!(remove_control_characters(""), "");
+    }
+
+    #[test]
+    fn test_remove_control_characters_no_control() {
+        assert_eq!(remove_control_characters("hello world 123"), "hello world 123");
+    }
+
+    #[test]
+    fn test_remove_control_characters_removes_newlines() {
+        assert_eq!(
+            remove_control_characters("line1\nline2\nline3"),
+            "line1line2line3"
+        );
+    }
+
+    #[test]
+    fn test_remove_control_characters_removes_tabs() {
+        assert_eq!(
+            remove_control_characters("col1\tcol2\tcol3"),
+            "col1col2col3"
+        );
+    }
+
+    #[test]
+    fn test_remove_control_characters_removes_carriage_return() {
+        assert_eq!(
+            remove_control_characters("text\r\ntext"),
+            "texttext"
+        );
+    }
+
+    #[test]
+    fn test_remove_control_characters_removes_null() {
+        assert_eq!(
+            remove_control_characters("hello\0world"),
+            "helloworld"
+        );
+    }
+
+    #[test]
+    fn test_remove_control_characters_mixed() {
+        let input = "Hello\tWorld\n!\r\nHow are\0you?";
+        let expected = "HelloWorld!How areyou?";
+        assert_eq!(remove_control_characters(input), expected);
+    }
+
+    #[test]
+    fn test_remove_control_characters_preserves_unicode() {
+        let input = "你好世界\t\n!";
+        let expected = "你好世界!";
+        assert_eq!(remove_control_characters(input), expected);
+    }
+
+    #[test]
+    fn test_remove_control_characters_only_control() {
+        assert_eq!(remove_control_characters("\n\r\t\0"), "");
+    }
+
+    #[test]
+    fn test_remove_control_characters_printable_chars() {
+        // 空格不是控制字符
+        assert_eq!(remove_control_characters(" a b c "), " a b c ");
+    }
+
+    // ========== query_gpt 测试（只测试函数签名和类型） ==========
+
+    #[test]
+    fn test_query_gpt_returns_result() {
+        // 测试函数签名正确（不实际调用 API）
+        // 这里我们只验证函数存在且签名正确
+        let _f: fn(&str) -> Result<String, Box<dyn Error>> = Gpt::query_gpt;
+    }
+}

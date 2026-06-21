@@ -1,27 +1,39 @@
-// 引入文件系统操作相关模块
+// API 密钥管理模块
+
 use std::fs::{create_dir, File};
-// 引入路径操作模块
 use std::path::Path;
-// 引入文件系统和输入输出相关模块
 use std::{fs, io};
 
-// 引入公共模块中的输出工具和服务结构体
 use crate::models::{Output, Service};
-// 引入 Quake 模块中的 Quake 结构体
 use crate::client::Quake;
-// 引入写入操作的 trait
 use std::io::Write;
 
 /// ApiKey 结构体，用于管理 API 密钥和 GPT API 密钥的初始化、设置和获取操作
 pub struct ApiKey;
 
 impl ApiKey {
+    /// 获取配置目录路径
+    fn config_dir() -> String {
+        let home = dirs::home_dir()
+            .expect("Failed to get home directory")
+            .to_str()
+            .unwrap()
+            .to_string();
+        format!("{}/.config/quake", home)
+    }
+
+    /// 确保目录存在，不存在则创建
+    fn ensure_dir(path: &str) {
+        if !Path::new(path).exists() {
+            if let Err(e) = create_dir(path) {
+                Output::error(&format!("创建路径失败: {}. {}", path, e));
+                std::process::exit(1);
+            }
+        }
+    }
+
     /// 初始化 Quake API 密钥
-    ///
-    /// # 参数
-    /// - `api_key`: 要设置的 Quake API 密钥
     pub fn init(api_key: String) {
-        // 写入 API 密钥
         if Self::set_api(api_key) {
             Output::success("成功初始化");
         } else {
@@ -30,11 +42,7 @@ impl ApiKey {
     }
 
     /// 初始化 GPT API 密钥
-    ///
-    /// # 参数
-    /// - `gpt_key`: 要设置的 GPT API 密钥
     pub fn gptinit(gpt_key: String) {
-        // 写入 API 密钥
         if Self::set_gptapi(gpt_key) {
             Output::success("成功初始化");
         } else {
@@ -42,27 +50,7 @@ impl ApiKey {
         }
     }
 
-    /// 获取用户主目录路径
-    ///
-    /// # 返回值
-    /// 用户主目录的路径字符串
-    fn get_path() -> String {
-        let path = dirs::home_dir()
-            .unwrap()
-            .as_path()
-            .to_str()
-            .unwrap()
-            .to_string();
-        path
-    }
-
     /// 检查 Quake API 密钥是否可用
-    ///
-    /// # 参数
-    /// - `apikey`: 要检查的 Quake API 密钥
-    ///
-    /// # 返回值
-    /// 如果密钥可用返回 `true`，否则返回 `false`
     fn check_api(apikey: String) -> bool {
         let (local, one_years_ago) = crate::models::getdate();
         let s = Service {
@@ -76,118 +64,61 @@ impl ApiKey {
             end_time: local,
             shortcuts: Vec::new(),
         };
-         Quake::new(apikey).search(s).is_ok()
+        Quake::new(apikey).search(s).is_ok()
     }
 
-    /// 检查 GPT API 密钥是否可用
-    ///
-    /// # 参数
-    /// - `apikey`: 要检查的 GPT API 密钥
-    ///
-    /// # 返回值
-    /// 目前总是返回 `true`，可根据实际需求实现检查逻辑
+    /// 检查 GPT API 密钥是否可用（目前直接返回 true）
     fn check_gptapi(_apikey: String) -> bool {
         true
     }
 
-    /// 创建配置目录
-    ///
-    /// # 参数
-    /// - `path`: 要创建的目录路径
-    fn create_config_dir(path: &str) {
-        if !Path::exists(Path::new(path)) {
-             if let Err(e) = create_dir(Path::new(path)) {
-                 Output::error(&format!("创建路径失败: {}. {}", path, e));
-                 std::process::exit(1);
-             }
+    /// 将密钥写入指定文件
+    fn write_key(filename: &str, apikey: &str) -> bool {
+        let config_path = Self::config_dir();
+        Self::ensure_dir(&config_path);
+        let key_path = format!("{}/{}", config_path, filename);
+
+        let mut file = match File::create(Path::new(&key_path)) {
+            Ok(f) => f,
+            Err(e) => {
+                Output::error(&format!("文件创建失败: {}", e));
+                std::process::exit(1);
+            }
+        };
+        match file.write_all(apikey.as_bytes()) {
+            Ok(_) => true,
+            Err(e) => {
+                Output::error(&format!("文件写入失败: {}", e));
+                std::process::exit(1);
+            }
         }
     }
 
     /// 设置 Quake API 密钥
-    ///
-    /// # 参数
-    /// - `apikey`: 要设置的 Quake API 密钥
-    ///
-    /// # 返回值
-    /// 如果密钥设置成功返回 `true`，否则返回 `false`
     pub fn set_api(apikey: String) -> bool {
-        let path = Self::get_path();
-        let config_path = format!("{}/.config/", path);
-        let quake_path = format!("{}/.config/quake/", path);
-        let api_path = format!("{}/.config/quake/api_key", path);
-
-        Self::create_config_dir(&config_path);
-        Self::create_config_dir(&quake_path);
-
         if Self::check_api(apikey.clone()) {
-            let mut file: File = match File::create(Path::new(&api_path)) {
-                Ok(f) => f,
-                Err(e) => {
-                     Output::error(&format!("文件创建失败: {}", e));
-                    std::process::exit(1);
-                }
-            };
-            return match file.write_all(apikey.as_bytes()) {
-                Ok(_) => true,
-                Err(e) => {
-                     Output::error(&format!("文件写入失败: {}", e));
-                    std::process::exit(1);
-                }
-            };
+            return Self::write_key("api_key", &apikey);
         }
         false
     }
 
     /// 获取 Quake API 密钥
-    ///
-    /// # 返回值
-    /// 包含 Quake API 密钥的 `Result` 类型，可能包含错误信息
     pub fn get_api() -> Result<String, io::Error> {
-        let path = format!("{}/.config/quake/api_key", Self::get_path());
+        let path = format!("{}/api_key", Self::config_dir());
         fs::read_to_string(path)
     }
 
     /// 设置 GPT API 密钥
-    ///
-    /// # 参数
-    /// - `apikey`: 要设置的 GPT API 密钥
-    ///
-    /// # 返回值
-    /// 如果密钥设置成功返回 `true`，否则返回 `false`
     pub fn set_gptapi(apikey: String) -> bool {
-        let path = Self::get_path();
-        let config_path = format!("{}/.config/", path);
-        let quake_path = format!("{}/.config/quake/", path);
-        let api_path = format!("{}/.config/quake/gptapi_key", path);
-
-        Self::create_config_dir(&config_path);
-        Self::create_config_dir(&quake_path);
-
         if Self::check_gptapi(apikey.clone()) {
-            let mut file: File = match File::create(Path::new(&api_path)) {
-                Ok(f) => f,
-                Err(e) => {
-                     Output::error(&format!("文件创建失败: {}", e));
-                    std::process::exit(1);
-                }
-            };
-            return match file.write_all(apikey.as_bytes()) {
-                Ok(_) => true,
-                Err(e) => {
-                     Output::error(&format!("文件写入失败: {}", e));
-                    std::process::exit(1);
-                }
-            };
+            return Self::write_key("gptapi_key", &apikey);
         }
         false
     }
 
     /// 获取 GPT API 密钥
-    ///
-    /// # 返回值
-    /// 包含 GPT API 密钥的 `Result` 类型，可能包含错误信息
     pub fn get_gptapi() -> Result<String, io::Error> {
-        let path = format!("{}/.config/quake/gptapi_key", Self::get_path());
+        let path = format!("{}/gptapi_key", Self::config_dir());
         fs::read_to_string(path)
     }
 }
