@@ -66,17 +66,12 @@ impl Record {
             .and_then(|s| s.get("name"))
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let ip = data_value
-            .get("ip")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let ip = data_value.get("ip").and_then(|v| v.as_str()).unwrap_or("");
         let port = data_value
             .get("port")
             .map(|v| v.to_string())
             .unwrap_or_default();
-        let location = data_value
-            .get("location")
-            .and_then(|v| v.as_object());
+        let location = data_value.get("location").and_then(|v| v.as_object());
         let country = location
             .and_then(|l| l.get("country_cn"))
             .and_then(|v| v.as_str())
@@ -123,11 +118,12 @@ impl Record {
             let mut current = data_value;
             for (i, key) in path.iter().enumerate() {
                 if i == path.len() - 1 {
-                    return current.get(*key).and_then(|v| v.as_array()).and_then(|arr| {
-                        arr.first()
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string())
-                    });
+                    return current
+                        .get(*key)
+                        .and_then(|v| v.as_array())
+                        .and_then(|arr| {
+                            arr.first().and_then(|v| v.as_str()).map(|s| s.to_string())
+                        });
                 }
                 current = current.get(*key)?.as_object()?;
             }
@@ -135,13 +131,24 @@ impl Record {
         };
 
         try_extract(&[
-            "service", "tls", "server_certificates", "certificate", "parsed",
-            "subject", "common_name",
+            "service",
+            "tls",
+            "server_certificates",
+            "certificate",
+            "parsed",
+            "subject",
+            "common_name",
         ])
         .or_else(|| {
             try_extract(&[
-                "service", "tls", "handshake_log", "server_certificates", "certificate",
-                "parsed", "subject", "common_name",
+                "service",
+                "tls",
+                "handshake_log",
+                "server_certificates",
+                "certificate",
+                "parsed",
+                "subject",
+                "common_name",
             ])
         })
         .unwrap_or_default()
@@ -215,7 +222,9 @@ impl Record {
             .and_then(|h| h.get("response_headers"))
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let mut text = String::with_capacity(cert.len() + response.len() + http_body.len() + http_header.len());
+        let mut text = String::with_capacity(
+            cert.len() + response.len() + http_body.len() + http_header.len(),
+        );
         text.push_str(cert);
         text.push_str(response);
         text.push_str(http_body);
@@ -232,14 +241,24 @@ fn show_results(
     data_type: &[&str],
 ) -> Vec<String> {
     let mut res = Vec::new();
-    let re = Regex::new(filter).unwrap();
+    let re = match compile_filter(filter) {
+        Ok(re) => re,
+        Err(e) => {
+            Output::error(&format!("Invalid filter regex: {}", e));
+            std::process::exit(1);
+        }
+    };
 
     for data_value in items {
         let record = Record::from_value(data_value);
         let mut f = record.format_fields(data_type);
 
         let regex_text = record.filter_text(data_value, filter);
-        let regex_res = re.find(&regex_text).map(|m| m.as_str()).unwrap_or("");
+        let regex_res = re
+            .as_ref()
+            .and_then(|re| re.find(&regex_text))
+            .map(|m| m.as_str())
+            .unwrap_or("");
 
         if showdata {
             print!("{}", f);
@@ -252,12 +271,15 @@ fn show_results(
     res
 }
 
-pub fn show(
-    value: Value,
-    showdata: bool,
-    filter: &str,
-    data_type: Vec<&str>,
-) -> Vec<String> {
+fn compile_filter(filter: &str) -> Result<Option<Regex>, regex::Error> {
+    if filter.is_empty() {
+        Ok(None)
+    } else {
+        Regex::new(filter).map(Some)
+    }
+}
+
+pub fn show(value: Value, showdata: bool, filter: &str, data_type: Vec<&str>) -> Vec<String> {
     let count = value["meta"]["pagination"]["count"].as_i64().unwrap() as usize;
     let total = value["meta"]["pagination"]["total"].as_i64().unwrap() as i32;
     Output::success("Successful.");
@@ -276,10 +298,7 @@ pub fn show_scroll(
     filter: &str,
     data_type: Vec<&str>,
 ) -> Vec<String> {
-    let items: Vec<&Map<String, Value>> = value
-        .iter()
-        .filter_map(|v| v.as_object())
-        .collect();
+    let items: Vec<&Map<String, Value>> = value.iter().filter_map(|v| v.as_object()).collect();
 
     show_results(items, showdata, filter, &data_type)
 }
@@ -307,10 +326,7 @@ fn format_host_record(data_value: &Map<String, Value>) -> String {
 
     for s in services {
         let protocol = s["name"].as_str().unwrap_or("");
-        let service_time = s["time"]
-            .as_str()
-            .unwrap_or("")
-            .replace("unknown", "");
+        let service_time = s["time"].as_str().unwrap_or("").replace("unknown", "");
         info.push_str(&format!(
             "| {port}\t{protocol:>width$}\t{time:>width$}\n",
             port = s["port"],
@@ -378,9 +394,7 @@ pub fn show_domain(
 
     for i in 0..count {
         let data_value = value["data"][i].take();
-        let domain = data_value["service"]["http"]["host"]
-            .as_str()
-            .unwrap_or("");
+        let domain = data_value["service"]["http"]["host"].as_str().unwrap_or("");
         let title = data_value["service"]["http"]["title"]
             .as_str()
             .unwrap_or("");
@@ -417,10 +431,7 @@ pub fn show_info(info: Value) {
         let email = data["user"]["email"].as_str().unwrap_or("无");
         let mobile_phone = data["mobile_phone"].as_str().unwrap_or("无");
         let role = data["role"].as_array().unwrap();
-        let role_info: Vec<&str> = role
-            .iter()
-            .filter_map(|r| r["fullname"].as_str())
-            .collect();
+        let role_info: Vec<&str> = role.iter().filter_map(|r| r["fullname"].as_str()).collect();
         Output::success("Successful.");
         Output::info(&format!("用户名:  {}", username));
         Output::info(&format!("邮  箱:  {}", email));
@@ -484,12 +495,18 @@ mod tests {
 
     #[test]
     fn test_sanitize_removes_tabs() {
-        assert_eq!("hello\tworld".replace(['"', '\t', '\n', '\r'], ""), "helloworld");
+        assert_eq!(
+            "hello\tworld".replace(['"', '\t', '\n', '\r'], ""),
+            "helloworld"
+        );
     }
 
     #[test]
     fn test_sanitize_removes_newlines() {
-        assert_eq!("line1\nline2\rline3\r\nline4".replace(['"', '\t', '\n', '\r'], ""), "line1line2line3line4");
+        assert_eq!(
+            "line1\nline2\rline3\r\nline4".replace(['"', '\t', '\n', '\r'], ""),
+            "line1line2line3line4"
+        );
     }
 
     #[test]
@@ -698,14 +715,17 @@ mod tests {
     fn test_record_filter_text_concatenates_fields() {
         let record = make_test_record();
         let mut map = serde_json::Map::new();
-        map.insert("service".to_string(), json!({
-            "cert": "cert_data",
-            "response": "resp_data",
-            "http": {
-                "body": "body_data",
-                "response_headers": "header_data"
-            }
-        }));
+        map.insert(
+            "service".to_string(),
+            json!({
+                "cert": "cert_data",
+                "response": "resp_data",
+                "http": {
+                    "body": "body_data",
+                    "response_headers": "header_data"
+                }
+            }),
+        );
         let result = record.filter_text(&map, "test");
         assert_eq!(result, "cert_dataresp_databody_dataheader_data");
     }
@@ -716,18 +736,24 @@ mod tests {
     fn test_format_host_record_basic() {
         let map = serde_json::Map::from_iter(vec![
             ("ip".to_string(), json!("10.0.0.1")),
-            ("location".to_string(), json!({
-                "country_en": "China",
-                "province_en": "Beijing",
-                "city_en": "Beijing"
-            })),
-            ("services".to_string(), json!([
-                {
-                    "port": 80,
-                    "name": "http",
-                    "time": "2024-01-15"
-                }
-            ])),
+            (
+                "location".to_string(),
+                json!({
+                    "country_en": "China",
+                    "province_en": "Beijing",
+                    "city_en": "Beijing"
+                }),
+            ),
+            (
+                "services".to_string(),
+                json!([
+                    {
+                        "port": 80,
+                        "name": "http",
+                        "time": "2024-01-15"
+                    }
+                ]),
+            ),
         ]);
         let result = format_host_record(&map);
         assert!(result.contains("IP: 10.0.0.1"));
@@ -742,15 +768,21 @@ mod tests {
     fn test_format_host_record_multiple_services() {
         let map = serde_json::Map::from_iter(vec![
             ("ip".to_string(), json!("10.0.0.1")),
-            ("location".to_string(), json!({
-                "country_en": "US",
-                "province_en": "California",
-                "city_en": "San Francisco"
-            })),
-            ("services".to_string(), json!([
-                {"port": 80, "name": "http", "time": "2024-01-01"},
-                {"port": 443, "name": "https", "time": "2024-01-02"}
-            ])),
+            (
+                "location".to_string(),
+                json!({
+                    "country_en": "US",
+                    "province_en": "California",
+                    "city_en": "San Francisco"
+                }),
+            ),
+            (
+                "services".to_string(),
+                json!([
+                    {"port": 80, "name": "http", "time": "2024-01-01"},
+                    {"port": 443, "name": "https", "time": "2024-01-02"}
+                ]),
+            ),
         ]);
         let result = format_host_record(&map);
         assert!(result.contains("http"));
@@ -761,14 +793,20 @@ mod tests {
     fn test_format_host_record_unknown_time() {
         let map = serde_json::Map::from_iter(vec![
             ("ip".to_string(), json!("10.0.0.1")),
-            ("location".to_string(), json!({
-                "country_en": "US",
-                "province_en": "CA",
-                "city_en": "SF"
-            })),
-            ("services".to_string(), json!([
-                {"port": 22, "name": "ssh", "time": "unknown"}
-            ])),
+            (
+                "location".to_string(),
+                json!({
+                    "country_en": "US",
+                    "province_en": "CA",
+                    "city_en": "SF"
+                }),
+            ),
+            (
+                "services".to_string(),
+                json!([
+                    {"port": 22, "name": "ssh", "time": "unknown"}
+                ]),
+            ),
         ]);
         let result = format_host_record(&map);
         assert!(!result.contains("unknown"));
@@ -837,24 +875,32 @@ mod tests {
     }
 
     #[test]
+    fn test_compile_filter_empty_returns_none() {
+        assert!(compile_filter("").unwrap().is_none());
+    }
+
+    #[test]
+    fn test_compile_filter_invalid_returns_error() {
+        assert!(compile_filter("[").is_err());
+    }
+
+    #[test]
     fn test_show_scroll_returns_formatted_strings() {
-        let items = vec![
-            json!({
-                "ip": "1.1.1.1",
-                "port": 443,
-                "service": {
-                    "name": "https",
-                    "http": {"title": "Test", "host": "test.com"}
-                },
-                "location": {
-                    "country_cn": "US",
-                    "province_cn": "CA",
-                    "city_cn": "SF",
-                    "owner": "Org"
-                },
-                "time": "2024-01-01"
-            }),
-        ];
+        let items = vec![json!({
+            "ip": "1.1.1.1",
+            "port": 443,
+            "service": {
+                "name": "https",
+                "http": {"title": "Test", "host": "test.com"}
+            },
+            "location": {
+                "country_cn": "US",
+                "province_cn": "CA",
+                "city_cn": "SF",
+                "owner": "Org"
+            },
+            "time": "2024-01-01"
+        })];
         let result = show_scroll(items, false, "", vec!["ip", "port"]);
         assert_eq!(result.len(), 1);
         assert!(result[0].contains("1.1.1.1"));
@@ -893,20 +939,18 @@ mod tests {
 
     #[test]
     fn test_show_host_by_scroll_returns_formatted() {
-        let items = vec![
-            json!({
-                "ip": "10.0.0.1",
-                "location": {
-                    "country_en": "US",
-                    "province_en": "NY",
-                    "city_en": "NYC"
-                },
-                "services": [
-                    {"port": 22, "name": "ssh", "time": "2024-01-01"},
-                    {"port": 80, "name": "http", "time": "2024-01-02"}
-                ]
-            }),
-        ];
+        let items = vec![json!({
+            "ip": "10.0.0.1",
+            "location": {
+                "country_en": "US",
+                "province_en": "NY",
+                "city_en": "NYC"
+            },
+            "services": [
+                {"port": 22, "name": "ssh", "time": "2024-01-01"},
+                {"port": 80, "name": "http", "time": "2024-01-02"}
+            ]
+        })];
         let result = show_host_by_scroll(items, false);
         assert_eq!(result.len(), 1);
         assert!(result[0].contains("IP: 10.0.0.1"));

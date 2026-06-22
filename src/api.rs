@@ -4,8 +4,8 @@ use std::fs::{create_dir, File};
 use std::path::Path;
 use std::{fs, io};
 
-use crate::models::{Output, Service};
 use crate::client::Quake;
+use crate::models::{Output, Service};
 use std::io::Write;
 
 /// ApiKey 结构体，用于管理 API 密钥和 GPT API 密钥的初始化、设置和获取操作

@@ -227,7 +227,10 @@ mod tests {
 
     #[test]
     fn test_remove_control_characters_no_control() {
-        assert_eq!(remove_control_characters("hello world 123"), "hello world 123");
+        assert_eq!(
+            remove_control_characters("hello world 123"),
+            "hello world 123"
+        );
     }
 
     #[test]
@@ -248,18 +251,12 @@ mod tests {
 
     #[test]
     fn test_remove_control_characters_removes_carriage_return() {
-        assert_eq!(
-            remove_control_characters("text\r\ntext"),
-            "texttext"
-        );
+        assert_eq!(remove_control_characters("text\r\ntext"), "texttext");
     }
 
     #[test]
     fn test_remove_control_characters_removes_null() {
-        assert_eq!(
-            remove_control_characters("hello\0world"),
-            "helloworld"
-        );
+        assert_eq!(remove_control_characters("hello\0world"), "helloworld");
     }
 
     #[test]

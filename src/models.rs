@@ -185,16 +185,10 @@ mod tests {
     #[test]
     fn test_getdate_one_year_diff() {
         let (now, one_year_ago) = getdate();
-        let now_date = NaiveDate::parse_from_str(
-            now.split(' ').next().unwrap(),
-            "%Y-%m-%d",
-        )
-        .unwrap();
-        let ago_date = NaiveDate::parse_from_str(
-            one_year_ago.split(' ').next().unwrap(),
-            "%Y-%m-%d",
-        )
-        .unwrap();
+        let now_date =
+            NaiveDate::parse_from_str(now.split(' ').next().unwrap(), "%Y-%m-%d").unwrap();
+        let ago_date =
+            NaiveDate::parse_from_str(one_year_ago.split(' ').next().unwrap(), "%Y-%m-%d").unwrap();
         let diff = now_date - ago_date;
         assert!(diff.num_days() >= 364 && diff.num_days() <= 366);
     }
@@ -304,7 +298,10 @@ mod tests {
         let json = serde_json::to_string(&s).unwrap();
         let deserialized: Service = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.ip_list.len(), 2);
-        assert_eq!(deserialized.ip_list[0], Value::String("1.1.1.1".to_string()));
+        assert_eq!(
+            deserialized.ip_list[0],
+            Value::String("1.1.1.1".to_string())
+        );
     }
 
     // ========== Output 结构体测试 ==========

@@ -37,12 +37,7 @@ impl Quake {
     fn send_post(&self, path: &str, body: &impl serde::Serialize) -> String {
         let url = format!("{}{}", BASE_URL, path);
         let client = Client::new();
-        let resp = match client
-            .post(&url)
-            .headers(self.header())
-            .json(body)
-            .send()
-        {
+        let resp = match client.post(&url).headers(self.header()).json(body).send() {
             Ok(resp) => resp,
             Err(e) => {
                 if e.is_timeout() {
@@ -190,7 +185,10 @@ impl Quake {
         size: i32,
     ) -> Result<Vec<Value>, serde_json::Error> {
         let sh = Self::init_scroll_host(query_string, size, "");
-        let res = self.send_post("/api/v3/scroll/quake_host", &Self::get_scrollhost_post_data(sh));
+        let res = self.send_post(
+            "/api/v3/scroll/quake_host",
+            &Self::get_scrollhost_post_data(sh),
+        );
         let response: Value = serde_json::from_str(&res)?;
         Self::check_response(&response);
 
@@ -308,14 +306,20 @@ impl Quake {
     }
 
     pub fn search(&self, service: Service) -> Result<Value, serde_json::Error> {
-        let res = self.send_post("/api/v3/search/quake_service", &Self::get_service_post_data(service));
+        let res = self.send_post(
+            "/api/v3/search/quake_service",
+            &Self::get_service_post_data(service),
+        );
         let response: Value = serde_json::from_str(&res)?;
         Self::check_response(&response);
         Ok(response)
     }
 
     pub fn get_scroll_data(&self, scroll: Scroll) -> String {
-        self.send_post("/api/v3/scroll/quake_service", &Self::get_scroll_post_data(scroll))
+        self.send_post(
+            "/api/v3/scroll/quake_service",
+            &Self::get_scroll_post_data(scroll),
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -374,7 +378,15 @@ impl Quake {
     ) -> Vec<Value> {
         let res = ApiKey::get_api().expect("Failed to read apikey:\t");
         match Quake::new(res).scroll(
-            query_string, size, time_start, time_end, cdn, mg, zxsj, wxqq, sjqc,
+            query_string,
+            size,
+            time_start,
+            time_end,
+            cdn,
+            mg,
+            zxsj,
+            wxqq,
+            sjqc,
         ) {
             Ok(response) => response,
             Err(e) => {
@@ -398,7 +410,16 @@ impl Quake {
         sjqc: i32,
     ) -> Result<Vec<Value>, serde_json::Error> {
         let scroll = Self::init_scroll(
-            query_string, size, time_start, time_end, cdn, mg, zxsj, wxqq, sjqc, "",
+            query_string,
+            size,
+            time_start,
+            time_end,
+            cdn,
+            mg,
+            zxsj,
+            wxqq,
+            sjqc,
+            "",
         );
         let res = self.get_scroll_data(scroll);
         let response: Value = serde_json::from_str(&res)?;
@@ -778,9 +799,7 @@ mod tests {
 
     #[test]
     fn test_init_scroll_basic() {
-        let s = Quake::init_scroll(
-            "port:80", 10, "", "", 0, 0, 0, 0, 0, "",
-        );
+        let s = Quake::init_scroll("port:80", 10, "", "", 0, 0, 0, 0, 0, "");
         assert_eq!(s.query, "port:80");
         assert_eq!(s.size, 10);
         assert!(s.ignore_cache);
@@ -789,16 +808,23 @@ mod tests {
 
     #[test]
     fn test_init_scroll_with_pagination() {
-        let s = Quake::init_scroll(
-            "test", 5, "", "", 0, 0, 0, 0, 0, "page3",
-        );
+        let s = Quake::init_scroll("test", 5, "", "", 0, 0, 0, 0, 0, "page3");
         assert_eq!(s.pagination_id, "page3");
     }
 
     #[test]
     fn test_init_scroll_with_shortcuts_and_time() {
         let s = Quake::init_scroll(
-            "port:443", 20, "2023-01-01", "2024-01-01", 1, 1, 0, 0, 1, "",
+            "port:443",
+            20,
+            "2023-01-01",
+            "2024-01-01",
+            1,
+            1,
+            0,
+            0,
+            1,
+            "",
         );
         assert_eq!(s.shortcuts.len(), 3);
         assert_eq!(s.start_time, "2023-01-01");

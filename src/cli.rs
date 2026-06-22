@@ -10,7 +10,6 @@ use crate::persistence;
 use clap::{Arg, ArgAction, Command};
 use regex::Regex;
 use serde_json::Value;
-use std::error::Error;
 
 /// 从 clap 匹配结果中解析 i32 参数，失败时返回默认值
 fn parse_i32(matches: &clap::ArgMatches, name: &str, default: i32) -> i32 {
@@ -28,12 +27,67 @@ fn get_str<'a>(matches: &'a clap::ArgMatches, name: &str, default: &'a str) -> S
         .unwrap_or_else(|| default.to_string())
 }
 
+#[derive(Debug, PartialEq)]
+struct GptQuery {
+    query: String,
+    size: i32,
+    time_start: String,
+    time_end: String,
+    output: Option<String>,
+}
+
+fn parse_gpt_query(query: &str, default_size: i32) -> GptQuery {
+    let query = query.trim_matches('"').replace('\\', "");
+    let size_re = Regex::new(r"--size\s+(\d+)").unwrap();
+    let time_start_re =
+        Regex::new(r"--(?:time_start|start_time)\s+(\d{4}-\d{1,2}(?:-\d{1,2})?)").unwrap();
+    let time_end_re =
+        Regex::new(r"--(?:time_end|end_time)\s+(\d{4}-\d{1,2}(?:-\d{1,2})?)").unwrap();
+    let output_re = Regex::new(r"--output\s+([^\s]+)").unwrap();
+    let trailing_and_re = Regex::new(r"(?i)\band\s*$").unwrap();
+
+    let size = size_re
+        .captures(&query)
+        .and_then(|c| c.get(1))
+        .and_then(|m| m.as_str().parse::<i32>().ok())
+        .unwrap_or(default_size);
+    let time_start = time_start_re
+        .captures(&query)
+        .and_then(|c| c.get(1))
+        .map(|m| m.as_str().to_string())
+        .unwrap_or_default();
+    let time_end = time_end_re
+        .captures(&query)
+        .and_then(|c| c.get(1))
+        .map(|m| m.as_str().to_string())
+        .unwrap_or_default();
+    let output = output_re
+        .captures(&query)
+        .and_then(|c| c.get(1))
+        .map(|m| m.as_str().to_string());
+
+    let query = size_re.replace_all(&query, "").to_string();
+    let query = time_start_re.replace_all(&query, "").to_string();
+    let query = time_end_re.replace_all(&query, "").to_string();
+    let query = output_re.replace_all(&query, "").to_string();
+    let query = trailing_and_re.replace_all(query.trim(), "").to_string();
+    let query = query.replace('"', "").trim().to_string();
+
+    GptQuery {
+        query,
+        size,
+        time_start,
+        time_end,
+        output,
+    }
+}
+
 pub struct ArgParse;
 
 impl ArgParse {
-    pub fn parse() {
-        let matches = Command::new("Quake Command-Line Application")
-            .version("3.1.7")
+    fn command() -> Command {
+        Command::new("Quake Command-Line Application")
+            .version(env!("CARGO_PKG_VERSION"))
             .author("Author: 360 Quake Team  <quake@360.cn>")
             .about("Dose awesome things.")
             .subcommand_required(true)
@@ -328,8 +382,72 @@ impl ArgParse {
                             .value_name("NUMBER")
                             .help("The size of the number of responses, up to a maximum of 100 (Default 10).")
                     )
+                    .arg(
+                        Arg::new("start")
+                            .long("start")
+                            .action(ArgAction::Set)
+                            .value_name("NUMBER")
+                            .help("Starting position of the query (Default 0).")
+                    )
+                    .arg(
+                        Arg::new("output")
+                            .short('o')
+                            .long("output")
+                            .action(ArgAction::Set)
+                            .help("Save the search information in the given file (append if file exists).")
+                            .value_name("FILENAME")
+                    )
+                    .arg(
+                        Arg::new("type")
+                            .short('t')
+                            .long("type")
+                            .action(ArgAction::Set)
+                            .value_name("TYPE")
+                            .help("Fields displayed:ip,port,title,product_name_cn,version,protocol,country,province,city,owner,time,ssldomain,domain. (Default ip,port,title)")
+                    )
+                    .arg(
+                        Arg::new("filter")
+                            .short('f')
+                            .long("filter")
+                            .action(ArgAction::Set)
+                            .value_name("TYPE")
+                            .help("Filter search results with more regular expressions.")
+                    )
+                    .arg(Arg::new("cdn")
+                        .short('c')
+                        .long("cdn")
+                        .action(ArgAction::Set)
+                        .value_name("NUMBER")
+                        .help("Exclude cdn data when parameter is 1,Not excluded by default"))
+                    .arg(Arg::new("honey_jar")
+                        .short('m')
+                        .long("honey_jar")
+                        .action(ArgAction::Set)
+                        .value_name("NUMBER")
+                        .help("Exclude honey_jar data when parameter is 1,Not excluded by default"))
+                    .arg(Arg::new("latest_data")
+                        .short('l')
+                        .long("latest_data")
+                        .action(ArgAction::Set)
+                        .value_name("NUMBER")
+                        .help("Display latest data when parameter is 1,Not up to date by default"))
+                    .arg(Arg::new("filter_request")
+                        .short('r')
+                        .long("filter_request")
+                        .action(ArgAction::Set)
+                        .value_name("NUMBER")
+                        .help("When the parameter is 1, invalid requests are filtered, such as 400, 401, 403 and other request data, the default is not filtered"))
+                    .arg(Arg::new("deduplication")
+                        .short('d')
+                        .long("deduplication")
+                        .action(ArgAction::Set)
+                        .value_name("NUMBER")
+                        .help("When the parameter is 1, data deduplication is performed, and no deduplication is performed by default."))
             )
-            .get_matches();
+    }
+
+    pub fn parse() {
+        let matches = Self::command().get_matches();
 
         match matches.subcommand() {
             Some(("init", init_match)) => {
@@ -369,8 +487,7 @@ impl ArgParse {
                 let response =
                     Quake::query(&query, "", start, size, "", "", cdn, mg, zxsj, wxqq, sjqc);
 
-                let _count = parse_i32(domain_match, "count", 0);
-                let onlycount = false;
+                let onlycount = parse_i32(domain_match, "count", 0) == 1;
 
                 let output = match domain_match.get_one::<String>("output") {
                     Some(output) => output.to_string(),
@@ -427,7 +544,7 @@ impl ArgParse {
                             let info_jf = match Quake::new(res).info() {
                                 Ok(value) => value,
                                 Err(e) => {
-                            Output::error(&format!("Query failed: {}", e));
+                                    Output::error(&format!("Query failed: {}", e));
                                     std::process::exit(1);
                                 }
                             };
@@ -513,7 +630,17 @@ impl ArgParse {
                 let filter = get_str(search_match, "filter", "");
                 if query_file.is_empty() {
                     let response = Quake::query(
-                        &query, &upload, start, size, &time_start, &time_end, cdn, mg, zxsj, wxqq, sjqc,
+                        &query,
+                        &upload,
+                        start,
+                        size,
+                        &time_start,
+                        &time_end,
+                        cdn,
+                        mg,
+                        zxsj,
+                        wxqq,
+                        sjqc,
                     );
                     let output = match search_match.get_one::<String>("output") {
                         Some(name) => name.to_string(),
@@ -547,7 +674,15 @@ impl ArgParse {
                         Output::info(&format!("Search with {}", query));
                     }
                     let response = Quake::query_for_scroll(
-                        &query, size, &time_start, &time_end, cdn, mg, zxsj, wxqq, sjqc,
+                        &query,
+                        size,
+                        &time_start,
+                        &time_end,
+                        cdn,
+                        mg,
+                        zxsj,
+                        wxqq,
+                        sjqc,
                     );
                     let output = match search_match.get_one::<String>("output") {
                         Some(name) => name.to_string(),
@@ -590,59 +725,32 @@ impl ArgParse {
                     }
                 };
 
-                let gpt_sj: Result<String, Box<dyn Error>> = match Gpt::query_gpt(&gptcs) {
+                let gpt_sj = match Gpt::query_gpt(&gptcs) {
                     Ok(res) => {
                         Output::info(&format!(
                             "Successfully converted the quake language method:{}",
                             res
                         ));
-                        Ok(res)
+                        res
                     }
                     Err(err) => {
-                        eprintln!("Error: {}", err);
-                        Err(err)
+                        Output::error(&format!("GPT query failed: {}", err));
+                        std::process::exit(1);
                     }
                 };
-                let upload = get_str(gpt_match, "upload", "");
-                let query_file = get_str(gpt_match, "query_file", "");
-                let query = gpt_sj.unwrap().trim_matches('"').replace('\\', "");
-
-                let sizere = Regex::new(r"--size\s+(\d+)").unwrap();
-                let time_startre = Regex::new(r"--time_start\s+(\d+-\d+)(?:-\d+)?").unwrap();
-                let time_endre = Regex::new(r"--time_end\s+(\d+-\d+)(?:-\d+)?").unwrap();
-                let outputre = Regex::new(r"--output\s+([^\s]+)").unwrap();
-                let andre = Regex::new(r"and\s*$").unwrap();
-                let size = sizere
-                    .captures(&query)
-                    .and_then(|c| c.get(1))
-                    .and_then(|m| m.as_str().parse::<i32>().ok())
-                    .unwrap_or(10);
-                let time_start = time_startre
-                    .captures(&query)
-                    .and_then(|c| c.get(1))
-                    .map(|m| m.as_str().to_string())
-                    .unwrap_or_default();
-                let time_end = time_endre
-                    .captures(&query)
-                    .and_then(|c| c.get(1))
-                    .map(|m| m.as_str().to_string())
-                    .unwrap_or_default();
+                let default_size = parse_i32(gpt_match, "size", 10);
+                let parsed = parse_gpt_query(&gpt_sj, default_size);
                 let start = parse_i32(gpt_match, "start", 0);
                 let cdn = parse_i32(gpt_match, "cdn", 0);
                 let mg = parse_i32(gpt_match, "honey_jar", 0);
                 let zxsj = parse_i32(gpt_match, "latest_data", 0);
                 let wxqq = parse_i32(gpt_match, "filter_request", 0);
                 let sjqc = parse_i32(gpt_match, "deduplication", 0);
+                let output = parsed
+                    .output
+                    .or_else(|| gpt_match.get_one::<String>("output").cloned());
 
-                let query = sizere.replace_all(&query, "").to_string();
-                let query = time_startre.replace_all(&query, "").to_string();
-                let query = time_endre.replace_all(&query, "").to_string();
-                let outputquery = query.clone();
-                let query = outputre.replace_all(&query, "").to_string();
-                let query = andre.replace_all(&query, "").to_string();
-                let query = query.replace('"', "");
-
-                if size > 100 {
+                if parsed.size > 100 {
                     Output::warning("Warning: Size is set to a maximum of 100, if set too high it may cause abnormal slowdowns or timeouts.");
                 }
 
@@ -650,58 +758,37 @@ impl ArgParse {
                 let data_type: Vec<&str> = data_type_str.split(',').collect();
                 let filter = get_str(gpt_match, "filter", "");
 
-                if query_file.is_empty() {
-                    let response = Quake::query(
-                        &query, &upload, start, size, &time_start, &time_end, cdn, mg, zxsj, wxqq, sjqc,
-                    );
-                    let output = outputre
-                        .captures(&outputquery)
-                        .and_then(|c| c.get(1))
-                        .map(|m| m.as_str().to_string());
-                    let output = match output {
-                        Some(name) => name,
-                        None => {
-                            display::show(response, true, &filter, data_type);
-                            std::process::exit(0);
-                        }
-                    };
-                    match persistence::save_search_data(&output, response, &filter, data_type) {
-                        Ok(count) => {
-                            Output::success(&format!(
-                                "Successfully saved {} pieces of data to {}",
-                                count, output
-                            ));
-                        }
-                        Err(e) => {
-                            Output::error(&format!("Data saving failure:{}", e));
-                        }
-                    };
-                } else {
-                    if !query.is_empty() {
-                        Output::info(&format!("Search with {}", query));
+                let response = Quake::query(
+                    &parsed.query,
+                    "",
+                    start,
+                    parsed.size,
+                    &parsed.time_start,
+                    &parsed.time_end,
+                    cdn,
+                    mg,
+                    zxsj,
+                    wxqq,
+                    sjqc,
+                );
+                let output = match output {
+                    Some(name) => name,
+                    None => {
+                        display::show(response, true, &filter, data_type);
+                        std::process::exit(0);
                     }
-                    let response = Quake::query_for_scroll(
-                        &query, size, &time_start, &time_end, cdn, mg, zxsj, wxqq, sjqc,
-                    );
-                    let output = match gpt_match.get_one::<String>("output") {
-                        Some(name) => name.to_string(),
-                        None => {
-                            display::show_scroll(response, true, &filter, data_type);
-                            std::process::exit(0);
-                        }
-                    };
-                    match persistence::save_scroll_data(&output, response, &filter, data_type) {
-                        Ok(count) => {
-                            Output::success(&format!(
-                                "Successfully saved {} pieces of data to {}",
-                                count, output
-                            ));
-                        }
-                        Err(e) => {
-                            Output::error(&format!("Data saving failure:{}", e));
-                        }
-                    };
-                }
+                };
+                match persistence::save_search_data(&output, response, &filter, data_type) {
+                    Ok(count) => {
+                        Output::success(&format!(
+                            "Successfully saved {} pieces of data to {}",
+                            count, output
+                        ));
+                    }
+                    Err(e) => {
+                        Output::error(&format!("Data saving failure:{}", e));
+                    }
+                };
             }
             Some(("honeypot", honeypot_match)) => {
                 let ip = match honeypot_match.get_one::<String>("ip") {
@@ -762,9 +849,7 @@ mod tests {
 
     #[test]
     fn test_parse_i32_default_value() {
-        let matches = test_command()
-            .try_get_matches_from(["test"])
-            .unwrap();
+        let matches = test_command().try_get_matches_from(["test"]).unwrap();
         assert_eq!(parse_i32(&matches, "num", 10), 10);
     }
 
@@ -804,9 +889,7 @@ mod tests {
 
     #[test]
     fn test_get_str_default_value() {
-        let matches = test_command()
-            .try_get_matches_from(["test"])
-            .unwrap();
+        let matches = test_command().try_get_matches_from(["test"]).unwrap();
         assert_eq!(get_str(&matches, "text", "fallback"), "fallback");
     }
 
@@ -823,10 +906,7 @@ mod tests {
         let matches = test_command()
             .try_get_matches_from(["test", "--text", "port:80 AND ip:1.1.1.1"])
             .unwrap();
-        assert_eq!(
-            get_str(&matches, "text", ""),
-            "port:80 AND ip:1.1.1.1"
-        );
+        assert_eq!(get_str(&matches, "text", ""), "port:80 AND ip:1.1.1.1");
     }
 
     #[test]
@@ -835,5 +915,98 @@ mod tests {
             .try_get_matches_from(["test", "--text", "你好世界"])
             .unwrap();
         assert_eq!(get_str(&matches, "text", ""), "你好世界");
+    }
+
+    #[test]
+    fn test_parse_gpt_query_extracts_embedded_options() {
+        let parsed = parse_gpt_query(
+            r#"app:"Apache" and --size 25 --time_start 2024-01-01 --time_end 2024-02 --output ./a.txt"#,
+            10,
+        );
+        assert_eq!(
+            parsed,
+            GptQuery {
+                query: "app:Apache".to_string(),
+                size: 25,
+                time_start: "2024-01-01".to_string(),
+                time_end: "2024-02".to_string(),
+                output: Some("./a.txt".to_string()),
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_gpt_query_uses_cli_size_default() {
+        let parsed = parse_gpt_query(r#"country:"CN""#, 50);
+        assert_eq!(parsed.size, 50);
+        assert_eq!(parsed.query, "country:CN");
+    }
+
+    #[test]
+    fn test_parse_gpt_query_size_overrides_cli_default() {
+        let parsed = parse_gpt_query(r#"country:"CN" --size 12"#, 50);
+        assert_eq!(parsed.size, 12);
+    }
+
+    #[test]
+    fn test_parse_gpt_query_supports_start_time_alias() {
+        let parsed = parse_gpt_query(
+            r#"port:443 --start_time 2023-01-01 --end_time 2023-12-31"#,
+            10,
+        );
+        assert_eq!(parsed.time_start, "2023-01-01");
+        assert_eq!(parsed.time_end, "2023-12-31");
+        assert_eq!(parsed.query, "port:443");
+    }
+
+    #[test]
+    fn test_gpt_command_accepts_search_options() {
+        let matches = ArgParse::command()
+            .try_get_matches_from([
+                "quake",
+                "gpt",
+                "apache servers",
+                "--size",
+                "50",
+                "--start",
+                "10",
+                "--output",
+                "result.txt",
+                "--type",
+                "ip,port",
+                "--filter",
+                "Apache",
+                "--cdn",
+                "1",
+                "--honey_jar",
+                "1",
+                "--latest_data",
+                "1",
+                "--filter_request",
+                "1",
+                "--deduplication",
+                "1",
+            ])
+            .unwrap();
+        let (_, gpt_matches) = matches.subcommand().unwrap();
+        assert_eq!(parse_i32(gpt_matches, "size", 10), 50);
+        assert_eq!(parse_i32(gpt_matches, "start", 0), 10);
+        assert_eq!(get_str(gpt_matches, "output", ""), "result.txt");
+        assert_eq!(get_str(gpt_matches, "type", ""), "ip,port");
+        assert_eq!(get_str(gpt_matches, "filter", ""), "Apache");
+        assert_eq!(parse_i32(gpt_matches, "cdn", 0), 1);
+        assert_eq!(parse_i32(gpt_matches, "honey_jar", 0), 1);
+        assert_eq!(parse_i32(gpt_matches, "latest_data", 0), 1);
+        assert_eq!(parse_i32(gpt_matches, "filter_request", 0), 1);
+        assert_eq!(parse_i32(gpt_matches, "deduplication", 0), 1);
+    }
+
+    #[test]
+    fn test_domain_count_flag_is_parsed() {
+        let matches = ArgParse::command()
+            .try_get_matches_from(["quake", "domain", "example.com", "--count", "1"])
+            .unwrap();
+        let (_, domain_matches) = matches.subcommand().unwrap();
+        assert_eq!(parse_i32(domain_matches, "count", 0), 1);
     }
 }

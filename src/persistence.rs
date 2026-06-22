@@ -28,11 +28,7 @@ fn newline() -> &'static str {
     }
 }
 
-pub fn save_domain_data(
-    filename: &str,
-    content: Value,
-    data_type: Vec<&str>,
-) -> io::Result<i32> {
+pub fn save_domain_data(filename: &str, content: Value, data_type: Vec<&str>) -> io::Result<i32> {
     let domains = display::show_domain(content, false, false, data_type);
     save_lines(filename, &domains)
 }
@@ -110,7 +106,11 @@ mod tests {
     fn test_save_lines_basic() {
         let tmp = NamedTempFile::new().unwrap();
         let path = tmp.path().to_str().unwrap();
-        let lines = vec!["line1".to_string(), "line2".to_string(), "line3".to_string()];
+        let lines = vec![
+            "line1".to_string(),
+            "line2".to_string(),
+            "line3".to_string(),
+        ];
         let count = save_lines(path, &lines).unwrap();
         assert_eq!(count, 3);
         let contents = fs::read_to_string(path).unwrap();
