@@ -18,9 +18,9 @@ jobs:
     # 指定运行该任务的环境为最新的 Ubuntu 系统
     runs-on: "ubuntu-latest"
     steps:
-      # 检出代码到工作目录，使用固定版本 v4 提高稳定性
+      # 检出代码到工作目录，使用固定版本 v7 提高稳定性
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # 创建版本发布，使用固定版本 v1.2.1 提高稳定性
       - name: Create Release
@@ -56,9 +56,9 @@ jobs:
     # 根据矩阵策略选择运行环境
     runs-on: ${{ matrix.os }}
     steps:
-      # 检出代码到工作目录，使用固定版本 v4 提高稳定性
+      # 检出代码到工作目录，使用固定版本 v7 提高稳定性
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       # 上传 Rust 二进制文件
       - name: "Upload rust binary"
         uses: taiki-e/upload-rust-binary-action@v1

@@ -4,7 +4,7 @@
 
 [![Rust](https://img.shields.io/badge/Rust-1.70%2B-orange)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/360quake/quake_rs)](https://github.com/360quake/quake_rs/releases)
+[![Release](https://img.shields.io/github/v/release/rootphantomer/quake_rs)](https://github.com/rootphantomer/quake_rs/releases)
 [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-brightgreen)]()
 [![Architecture](https://img.shields.io/badge/Architecture-Modular-green)]()
 
@@ -48,7 +48,7 @@ models → (无内部依赖)
 
 ### 下载预编译二进制
 
-从 [Releases](https://github.com/360quake/quake_rs/releases) 页面下载对应平台的二进制文件即可直接使用。
+从 [Releases](https://github.com/rootphantomer/quake_rs/releases) 页面下载对应平台的二进制文件即可直接使用。
 
 ### 从源码编译
 
@@ -425,14 +425,14 @@ cargo build --release
 
 ## 链接
 
-- [GitHub 仓库](https://github.com/360quake/quake_rs)
+- [GitHub 仓库](https://github.com/rootphantomer/quake_rs)
 - [Quake 网络空间测绘系统](https://quake.360.net)
 - [Quake 个人中心](https://quake.360.net/centre/user-info)
 - [系统设计文档](docs/system_design.md)
 
 ## 问题反馈
 
-- GitHub Issues：[提交 Bug 或功能请求](https://github.com/360quake/quake_rs/issues)
+- GitHub Issues：[提交 Bug 或功能请求](https://github.com/rootphantomer/quake_rs/issues)
 - 技术交流：添加微信 `quake_360` 邀您加入交流群
 
 ## 更新日志

@@ -21,7 +21,7 @@ jobs:
       # 检出代码到工作目录
       - name: Checkout Code
         # 使用固定版本的 action 以提高稳定性
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # 创建版本发布
       - name: Create Release
@@ -55,7 +55,7 @@ jobs:
       # 检出代码到工作目录
       - name: Checkout Code
         # 使用固定版本的 action 以提高稳定性
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       # 上传 Rust 二进制文件
       - name: "Upload rust binary"
         uses: taiki-e/upload-rust-binary-action@v1
