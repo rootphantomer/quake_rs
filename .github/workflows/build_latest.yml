@@ -1,20 +1,20 @@
 # 工作流名称，用于标识该 GitHub Actions 工作流
-name: rust_build_test
+name: build_latest
 
 # 工作流所需的权限，允许对仓库内容进行写入操作
 permissions:
   contents: write
 
-# 触发工作流的事件，当代码推送到 build_test 分支时触发
+# 触发工作流的事件。仅支持手动触发。
+# 该工作流用于在不发布正式版本号的前提下，验证多平台打包流程是否正常，
+#产物发布到 latest 预发布渠道。
 on:
-  push:
-    branches:
-      - "build_test"
+  workflow_dispatch:
 
 jobs:
-  # 标记版本发布测试的任务
-  tagged-release-test:
-    name: "Tagged Release Test"
+  # 创建 latest 预发布渠道的任务
+  create-latest-release:
+    name: "Create Latest Release"
     # 指定运行该任务的环境为最新的 Ubuntu 系统
     runs-on: "ubuntu-latest"
     steps:
@@ -30,31 +30,38 @@ jobs:
           token: "${{ secrets.GITHUB_TOKEN }}"
           # 固定使用 latest 作为标签名称，便于测试渠道分发
           tag_name: "latest"
+          # latest 标签已存在且指向历史提交，显式指定目标分支，
+          # 确保 Release 与资产始终对应当前 master 的最新代码
+          target_commitish: "master"
           # 版本发布的标题
-          name: "Rust Build Test"
+          name: "Latest Build"
           # 标记为预发布版本
           prerelease: true
           # 由 GitHub 依据 commit 记录自动生成发布说明
           generate_release_notes: true
 
-  # 上传资产测试的任务
-  upload-assets-test:
+  # 上传多平台资产的任务
+  upload-assets:
     name: "Upload assets"
+    # 依赖发布任务完成，确保 Release 已存在后再上传资产，避免竞态
+    needs: create-latest-release
     # 使用矩阵策略，在不同的操作系统和目标平台上运行任务
     strategy:
       matrix:
         include:
-          - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
-          - target: aarch64-apple-darwin
-            os: macos-latest
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
           - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
             os: macos-latest
           # 支持 macOS 通用二进制文件
           - target: universal-apple-darwin
             os: macos-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
     # 根据矩阵策略选择运行环境
     runs-on: ${{ matrix.os }}
     steps:
@@ -65,8 +72,8 @@ jobs:
       - name: "Upload rust binary"
         uses: taiki-e/upload-rust-binary-action@v1
         with:
-          # 当前 Git 引用
-          ref: ${{ github.ref }}
+          # 当前 Git 引用，指向发布使用的标签，确保资产与 Release 对应同一 commit
+          ref: refs/tags/latest
           # 二进制文件名称
           bin: quake
           # 目标平台
