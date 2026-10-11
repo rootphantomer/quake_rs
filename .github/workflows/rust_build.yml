@@ -25,11 +25,17 @@ jobs:
 
       # 创建版本发布
       - name: Create Release
-        # 使用固定版本的 action 以提高稳定性
-        uses: "marvinpinto/action-automatic-releases@v1.2.1"
+        # 使用固定版本的 action 以提高稳定性（v3 基于 Node.js 24）
+        uses: softprops/action-gh-release@v3
         with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          # 使用 GitHub 提供的令牌进行认证
+          token: "${{ secrets.GITHUB_TOKEN }}"
+          # 使用触发本次发布的标签作为版本标签
+          tag_name: "${{ github.ref_name }}"
+          # 标记为正式版本
           prerelease: false
+          # 由 GitHub 依据 commit 记录自动生成发布说明
+          generate_release_notes: true
 
   # 上传资产的任务
   upload-assets:

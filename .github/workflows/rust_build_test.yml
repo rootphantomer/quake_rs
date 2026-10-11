@@ -22,18 +22,20 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v7
 
-      # 创建版本发布，使用固定版本 v1.2.1 提高稳定性
+      # 创建版本发布，使用固定版本 v3 提高稳定性
       - name: Create Release
-        uses: "marvinpinto/action-automatic-releases@v1.2.1"
+        uses: softprops/action-gh-release@v3
         with:
           # 使用 GitHub 提供的令牌进行认证
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          # 自动发布的标签名称
-          automatic_release_tag: "latest"
+          token: "${{ secrets.GITHUB_TOKEN }}"
+          # 固定使用 latest 作为标签名称，便于测试渠道分发
+          tag_name: "latest"
           # 版本发布的标题
-          title: "Rust Build Test"
+          name: "Rust Build Test"
           # 标记为预发布版本
           prerelease: true
+          # 由 GitHub 依据 commit 记录自动生成发布说明
+          generate_release_notes: true
 
   # 上传资产测试的任务
   upload-assets-test:
