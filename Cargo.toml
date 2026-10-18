@@ -17,7 +17,7 @@ env_logger = "^0.11.6"
 ansi_term = "^0.12.1"
 chrono = "^0.4.41"
 regex = "^1.12.3"
-ipaddress = "^0.1.1"
+ipaddress = "^0.2.11"
 
 [dev-dependencies]
 tempfile = "^3"
