@@ -1,0 +1,78 @@
+# 依赖更新自动合并工作流
+#
+# 设计要点：
+# 1. 只处理 dependabot 发出的 PR，人工 PR 一律不受影响
+# 2. 只自动合并「补丁级」分组 PR（patch-updates），
+#    小版本与主版本仍需人工评审
+# 3. 不直接使用 gh pr checks --watch，因为本工作流自身的 job 也会
+#    出现在该 PR 的检查列表中，会导致等待自己而永久挂起。
+#    改为通过 API 轮询名为 "Check & Lint" 的检查项结论。
+name: Dependabot Auto Merge
+
+on:
+  pull_request:
+    # dependabot 新建、推送新提交、重开 PR 时触发
+    types: [opened, synchronize, reopened]
+
+# 合并 PR 需要写权限
+permissions:
+  contents: write
+  pull-requests: write
+
+# 同一 PR 有新提交时取消上一轮，避免重复合并
+concurrency:
+  group: dependabot-auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  auto-merge:
+    name: "Auto merge patch updates"
+    # 仅处理 dependabot 机器人发起的 PR
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      # 读取 dependabot 的更新元数据，用于判断更新级别与分组
+      - name: Fetch dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@v3
+
+      - name: Wait for CI and squash merge
+        # 只自动合并补丁级分组；兜底兼容未进入分组的单个补丁更新
+        if: steps.meta.outputs.dependency-group == 'patch-updates' || steps.meta.outputs.update-type == 'version-update:semver-patch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -uo pipefail
+
+          # 轮询 CI 检查项，最多等待约 20 分钟
+          for i in $(seq 1 60); do
+            conclusion=$(gh api "repos/${REPO}/commits/${SHA}/check-runs?per_page=100" \
+              --jq '[.check_runs[] | select(.name == "Check & Lint")]
+                    | sort_by(.started_at // "") | last | .conclusion // ""')
+
+            case "$conclusion" in
+              success)
+                echo "CI 通过，准备合并"
+                break
+                ;;
+              failure|cancelled|timed_out|action_required)
+                echo "CI 未通过（${conclusion}），放弃自动合并"
+                exit 1
+                ;;
+              *)
+                echo "[$i/60] 等待 CI 完成，当前状态：${conclusion:-尚未开始}"
+                ;;
+            esac
+
+            if [ "$i" -eq 60 ]; then
+              echo "等待 CI 超时，放弃自动合并"
+              exit 1
+            fi
+            sleep 20
+          done
+
+          # 再次确认 PR 仍处于可合并状态后执行 squash 合并
+          gh pr merge "$PR_URL" --squash --delete-branch

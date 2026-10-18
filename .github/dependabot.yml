@@ -1,24 +1,36 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
+# Dependabot 依赖更新配置
+# 完整参数说明见：
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 
 version: 2
 updates:
-  - package-ecosystem: "cargo" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  - package-ecosystem: "cargo"
+    directory: "/"
     schedule:
       interval: "weekly"
-    # 添加拉取请求的标签
+      # 固定周一早上生成更新 PR，避免周中插入提交干扰开发
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
     labels:
       - "dependencies"
-    # 允许的更新类型
-    open-pull-requests-limit: 10
-    # 允许的更新类型
+    # 分组后每个分组只占 1 个 PR，5 个名额足够
+    open-pull-requests-limit: 5
+    # 直接依赖与传递依赖都纳入更新范围
     allow:
       - dependency-type: "direct"
       - dependency-type: "indirect"
-    # 移除不在架构内的 auto-merge 配置
-    # auto-merge:
-    #   enabled: true
-    #   merge-method: "squash"
+    # 按更新级别分组，把原先十几个独立 PR 收敛为 2 个。
+    # 注意：分组仅对 version updates 生效，安全更新仍会单独提 PR。
+    groups:
+      # 补丁级更新：CI 通过后由 dependabot-auto-merge 工作流自动合并
+      patch-updates:
+        applies-to: version-updates
+        update-types:
+          - "patch"
+      # 小版本更新：合并为一个 PR 集中评审，不自动合并
+      minor-updates:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+    # 主版本更新不分组，保持每个依赖一个独立 PR，逐个人工评估
