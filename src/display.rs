@@ -11,6 +11,18 @@ fn sanitize(s: &str) -> String {
     s.replace(['"', '\t', '\n', '\r'], "")
 }
 
+/// 对敏感信息进行脱敏展示
+fn mask_sensitive(s: &str) -> String {
+    let chars: Vec<char> = s.chars().collect();
+    let len = chars.len();
+    if len <= 2 {
+        return "*".repeat(len.max(1));
+    }
+    let first = chars[0];
+    let last = chars[len - 1];
+    format!("{}{}{}", first, "*".repeat(len - 2), last)
+}
+
 /// 从 JSON Value 中提取搜索结果的字段
 struct Record {
     ip: String,
@@ -430,12 +442,15 @@ pub fn show_info(info: Value) {
         let username = data["user"]["username"].as_str().unwrap_or("无");
         let email = data["user"]["email"].as_str().unwrap_or("无");
         let mobile_phone = data["mobile_phone"].as_str().unwrap_or("无");
+        let masked_username = mask_sensitive(username);
+        let masked_email = mask_sensitive(email);
+        let masked_mobile_phone = mask_sensitive(mobile_phone);
         let role = data["role"].as_array().unwrap();
         let role_info: Vec<&str> = role.iter().filter_map(|r| r["fullname"].as_str()).collect();
         Output::success("Successful.");
-        Output::info(&format!("用户名:  {}", username));
-        Output::info(&format!("邮  箱:  {}", email));
-        Output::info(&format!("手  机:  {}", mobile_phone));
+        Output::info(&format!("用户名:  {}", masked_username));
+        Output::info(&format!("邮  箱:  {}", masked_email));
+        Output::info(&format!("手  机:  {}", masked_mobile_phone));
         Output::info(&format!("月度积分: {}", credit));
         Output::info(&format!("长效积分: {}", persistent_credit));
         Output::info(&format!("角  色:  {}", role_info.join(",")));
