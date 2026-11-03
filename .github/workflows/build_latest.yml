@@ -22,6 +22,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v7
 
+      # 使用固定模板生成 latest 预发布说明
+      - name: Render release notes
+        run: bash .github/scripts/render-release-notes.sh latest "$RUNNER_TEMP/release-notes.md"
+
       # 创建版本发布，使用固定版本 v3 提高稳定性
       - name: Create Release
         uses: softprops/action-gh-release@v3
@@ -37,8 +41,9 @@ jobs:
           name: "Latest Build"
           # 标记为预发布版本
           prerelease: true
-          # 由 GitHub 依据 commit 记录自动生成发布说明
-          generate_release_notes: true
+          # 使用统一模板生成的发布说明，避免重复追加历史内容
+          body_path: "${{ runner.temp }}/release-notes.md"
+          generate_release_notes: false
 
   # 上传多平台资产的任务
   upload-assets:

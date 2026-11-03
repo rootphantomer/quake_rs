@@ -22,6 +22,15 @@ jobs:
       - name: Checkout Code
         # 使用固定版本的 action 以提高稳定性
         uses: actions/checkout@v7
+        with:
+          # 拉取完整历史，便于计算上一个版本标签
+          fetch-depth: 0
+
+      # 从 CHANGELOG.md 生成统一格式的发布说明
+      - name: Render release notes
+        env:
+          TAG: "${{ github.ref_name }}"
+        run: bash .github/scripts/render-release-notes.sh "$TAG" "$RUNNER_TEMP/release-notes.md"
 
       # 创建版本发布
       - name: Create Release
@@ -34,8 +43,9 @@ jobs:
           tag_name: "${{ github.ref_name }}"
           # 标记为正式版本
           prerelease: false
-          # 由 GitHub 依据 commit 记录自动生成发布说明
-          generate_release_notes: true
+          # 使用统一模板生成的发布说明
+          body_path: "${{ runner.temp }}/release-notes.md"
+          generate_release_notes: false
 
   # 上传资产的任务
   upload-assets:
