@@ -15,12 +15,12 @@ fn sanitize(s: &str) -> String {
 fn mask_sensitive(s: &str) -> String {
     let chars: Vec<char> = s.chars().collect();
     let len = chars.len();
-    if len <= 2 {
+    if len <= 4 {
         return "*".repeat(len.max(1));
     }
-    let first = chars[0];
-    let last = chars[len - 1];
-    format!("{}{}{}", first, "*".repeat(len - 2), last)
+    let prefix: String = chars[..2].iter().collect();
+    let suffix: String = chars[len - 2..].iter().collect();
+    format!("{}{}{}", prefix, "*".repeat(len - 4), suffix)
 }
 
 /// 从 JSON Value 中提取搜索结果的字段
@@ -527,6 +527,30 @@ mod tests {
     #[test]
     fn test_sanitize_mixed() {
         assert_eq!(sanitize("\"tab\there\"\nnew\rline"), "tabherenewline");
+    }
+
+    // ========== mask_sensitive 测试 ==========
+
+    #[test]
+    fn test_mask_sensitive_short_strings() {
+        assert_eq!(mask_sensitive(""), "*");
+        assert_eq!(mask_sensitive("a"), "*");
+        assert_eq!(mask_sensitive("ab"), "**");
+        assert_eq!(mask_sensitive("abc"), "***");
+        assert_eq!(mask_sensitive("abcd"), "****");
+    }
+
+    #[test]
+    fn test_mask_sensitive_keeps_two_chars_at_each_end() {
+        assert_eq!(mask_sensitive("rootphantomer"), "ro*********er");
+        assert_eq!(mask_sensitive("13800138000"), "13*******00");
+        assert_eq!(mask_sensitive("abc@example.com"), "ab***********om");
+    }
+
+    #[test]
+    fn test_mask_sensitive_unicode() {
+        assert_eq!(mask_sensitive("张三丰"), "***");
+        assert_eq!(mask_sensitive("张三丰同学"), "张三*同学");
     }
 
     // ========== Record 测试 ==========
